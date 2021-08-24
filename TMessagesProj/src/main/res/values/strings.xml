@@ -4569,4 +4569,9 @@
     <string name="FavoriteStickersShort">Favorites</string>
     <string name="FeaturedStickersShort">Trendings</string>
     <string name="RecentStickersShort">Recent</string>
+    <string name="ChangeColors">Change colors</string>
+    <string name="SelectTheme">Select theme</string>
+    <string name="no_theme">No Theme</string>
+    <string name="reset_theme">Reset Theme</string>
+    <string name="apply_theme">Apply Theme</string>
 </resources>

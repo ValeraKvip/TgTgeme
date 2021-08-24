@@ -2238,7 +2238,8 @@ public class AndroidUtilities {
             return;
         }
         try {
-            if (BuildVars.DEBUG_VERSION) {
+            //TODO something wrong with microsoft appcenter imports.
+            if (BuildVars.DEBUG_VERSION && Build.VERSION.SDK_INT >= 21) {
                 Distribute.setEnabledForDebuggableBuild(true);
                 AppCenter.start(context.getApplication(), BuildVars.DEBUG_VERSION ? BuildVars.APPCENTER_HASH_DEBUG : BuildVars.APPCENTER_HASH, Distribute.class, Crashes.class);
                 AppCenter.setUserId("uid=" + UserConfig.getInstance(UserConfig.selectedAccount).clientUserId);

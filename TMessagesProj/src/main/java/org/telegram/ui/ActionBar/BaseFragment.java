@@ -29,6 +29,7 @@ import android.widget.FrameLayout;
 
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.ChatThemesController;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.FileLoader;
@@ -557,6 +558,10 @@ public abstract class BaseFragment {
 
     public MediaDataController getMediaDataController() {
         return getAccountInstance().getMediaDataController();
+    }
+
+    public ChatThemesController getChatThemesController() {
+        return getAccountInstance().getChatThemesController();
     }
 
     public ConnectionsManager getConnectionsManager() {

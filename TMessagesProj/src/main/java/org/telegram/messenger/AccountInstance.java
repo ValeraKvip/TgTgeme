@@ -41,6 +41,10 @@ public class AccountInstance {
         return MediaDataController.getInstance(currentAccount);
     }
 
+    public ChatThemesController getChatThemesController() {
+        return ChatThemesController.getInstance(currentAccount);
+    }
+
     public ConnectionsManager getConnectionsManager() {
         return ConnectionsManager.getInstance(currentAccount);
     }

@@ -24,6 +24,7 @@ import android.text.style.ClickableSpan;
 import android.text.style.URLSpan;
 import android.text.util.Linkify;
 import android.util.Base64;
+import android.util.Log;
 import android.util.SparseArray;
 
 import org.telegram.PhoneFormat.PhoneFormat;
@@ -1131,7 +1132,10 @@ public class MessageObject {
             } else {
                 messageText = replaceWithLink(LocaleController.getString("EventLogChannelJoined", R.string.EventLogChannelJoined), "un1", fromUser);
             }
-        } else if (event.action instanceof TLRPC.TL_channelAdminLogEventActionParticipantLeave) {
+        }
+
+
+        else if (event.action instanceof TLRPC.TL_channelAdminLogEventActionParticipantLeave) {
             messageOwner = new TLRPC.TL_messageService();
             messageOwner.action = new TLRPC.TL_messageActionChatDeleteUser();
             messageOwner.action.user_id = event.user_id;
@@ -2560,7 +2564,13 @@ public class MessageObject {
                     }
                 } else if (messageOwner.action instanceof TLRPC.TL_messageActionCustomAction) {
                     messageText = messageOwner.action.message;
-                } else if (messageOwner.action instanceof TLRPC.TL_messageActionChatCreate) {
+                } else if (messageOwner.action instanceof TLRPC.TL_messageActionSetChatTheme) {
+                    String emoticon = ((TLRPC.TL_messageActionSetChatTheme) messageOwner.action).emoticon;
+                    messageText = emoticon.isEmpty()?"User disabled chat theme ":
+                            "User changed chat theme to " +  emoticon;
+
+                }
+                else if (messageOwner.action instanceof TLRPC.TL_messageActionChatCreate) {
                     if (isOut()) {
                         messageText = LocaleController.getString("ActionYouCreateGroup", R.string.ActionYouCreateGroup);
                     } else {
