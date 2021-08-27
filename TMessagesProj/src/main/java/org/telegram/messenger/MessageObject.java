@@ -2566,8 +2566,12 @@ public class MessageObject {
                     messageText = messageOwner.action.message;
                 } else if (messageOwner.action instanceof TLRPC.TL_messageActionSetChatTheme) {
                     String emoticon = ((TLRPC.TL_messageActionSetChatTheme) messageOwner.action).emoticon;
-                    messageText = emoticon.isEmpty()?"User disabled chat theme ":
-                            "User changed chat theme to " +  emoticon;
+                    String user =  UserObject.getUserName(fromUser);
+                    messageText = (
+                            (emoticon == null || emoticon.isEmpty())
+                                    ? LocaleController.formatString("DisableChatTheme", R.string.DisableChatTheme,user)
+                                    :LocaleController.formatString("ChangeChatTheme", R.string.ChangeChatTheme, user,emoticon)
+                            );
 
                 }
                 else if (messageOwner.action instanceof TLRPC.TL_messageActionChatCreate) {

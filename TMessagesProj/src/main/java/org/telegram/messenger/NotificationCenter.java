@@ -19,6 +19,7 @@ import java.util.HashSet;
 
 public class NotificationCenter {
 
+
     private static int totalEvents = 1;
 
     public static final int didReceiveNewMessages = totalEvents++;
@@ -220,6 +221,9 @@ public class NotificationCenter {
     public static final int webRtcSpeakerAmplitudeEvent = totalEvents++;
     public static final int showBulletin = totalEvents++;
     public static final int appUpdateAvailable = totalEvents++;
+    public static  final int updateThemePreview = totalEvents++;
+    public static  final int invalidateCachedViews = totalEvents++;
+
 
     private SparseArray<ArrayList<NotificationCenterDelegate>> observers = new SparseArray<>();
     private SparseArray<ArrayList<NotificationCenterDelegate>> removeAfterBroadcast = new SparseArray<>();

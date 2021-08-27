@@ -105,7 +105,7 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
         }
 
         titleTextView = new SimpleTextView(context);
-        titleTextView.setTextColor(Theme.getColor(Theme.key_actionBarDefaultTitle));
+        titleTextView.setTextColor(Theme.getChatColor(Theme.key_actionBarDefaultTitle));
         titleTextView.setTextSize(18);
         titleTextView.setGravity(Gravity.LEFT);
         titleTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
@@ -113,7 +113,7 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
         addView(titleTextView);
 
         subtitleTextView = new SimpleTextView(context);
-        subtitleTextView.setTextColor(Theme.getColor(Theme.key_actionBarDefaultSubtitle));
+        subtitleTextView.setTextColor(Theme.getChatColor(Theme.key_actionBarDefaultSubtitle));
         subtitleTextView.setTag(Theme.key_actionBarDefaultSubtitle);
         subtitleTextView.setTextSize(14);
         subtitleTextView.setGravity(Gravity.LEFT);
@@ -343,7 +343,7 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
         if (scam || fake) {
             if (!(titleTextView.getRightDrawable() instanceof ScamDrawable)) {
                 ScamDrawable drawable = new ScamDrawable(11, scam ? 0 : 1);
-                drawable.setColor(Theme.getColor(Theme.key_actionBarDefaultSubtitle));
+                drawable.setColor(Theme.getChatColor(Theme.key_actionBarDefaultSubtitle));
                 titleTextView.setRightDrawable(drawable);
             }
         } else if (titleTextView.getRightDrawable() instanceof ScamDrawable) {
@@ -578,7 +578,7 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
         lastSubtitleColorKey = useOnlineColor ? Theme.key_chat_status : Theme.key_actionBarDefaultSubtitle;
         if (lastSubtitle == null) {
             subtitleTextView.setText(newSubtitle);
-            subtitleTextView.setTextColor(Theme.getColor(lastSubtitleColorKey));
+            subtitleTextView.setTextColor(Theme.getChatColor(lastSubtitleColorKey));
             subtitleTextView.setTag(lastSubtitleColorKey);
         } else {
             lastSubtitle = newSubtitle;
@@ -720,7 +720,7 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
                 subtitleTextView.setText(lastSubtitle);
                 lastSubtitle = null;
                 if (lastSubtitleColorKey != null) {
-                    subtitleTextView.setTextColor(Theme.getColor(lastSubtitleColorKey));
+                    subtitleTextView.setTextColor(Theme.getChatColor(lastSubtitleColorKey));
                     subtitleTextView.setTag(lastSubtitleColorKey);
                 }
             }
@@ -729,7 +729,7 @@ public class ChatAvatarContainer extends FrameLayout implements NotificationCent
                 lastSubtitle = subtitleTextView.getText();
             }
             subtitleTextView.setText(title);
-            subtitleTextView.setTextColor(Theme.getColor(Theme.key_actionBarDefaultSubtitle));
+            subtitleTextView.setTextColor(Theme.getChatColor(Theme.key_actionBarDefaultSubtitle));
             subtitleTextView.setTag(Theme.key_actionBarDefaultSubtitle);
         }
     }

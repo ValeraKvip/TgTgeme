@@ -40,6 +40,7 @@ import android.provider.ContactsContract;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Base64;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.ActionMode;
 import android.view.Gravity;
@@ -747,6 +748,7 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.suggestedLangpack);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.didSetNewTheme);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.needSetDayNightTheme);
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.invalidateCachedViews);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.needCheckSystemBarColors);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.closeOtherAppActivities);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.didSetPasscode);
@@ -2467,7 +2469,7 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
             } catch (Throwable ignore) {
 
             }
-            if (videoTimestamp == - 1) {
+            if (videoTimestamp == -1) {
                 DateFormat dateFormat = new SimpleDateFormat("mm:ss");
                 Date reference = null;
                 try {
@@ -2577,7 +2579,7 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
     }
 
     private void runImportRequest(final Uri importUri,
-                                ArrayList<Uri> documents) {
+                                  ArrayList<Uri> documents) {
         final int intentAccount = UserConfig.selectedAccount;
         final AlertDialog progressDialog = new AlertDialog(this, 3);
         final int[] requestId = new int[]{0};
@@ -3741,7 +3743,7 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
     public void showBulletin(Function<BulletinFactory, Bulletin> createBulletin) {
         BaseFragment topFragment = null;
         if (!layerFragmentsStack.isEmpty()) {
-             topFragment = layerFragmentsStack.get(layerFragmentsStack.size() - 1);
+            topFragment = layerFragmentsStack.get(layerFragmentsStack.size() - 1);
         } else if (!rightFragmentsStack.isEmpty()) {
             topFragment = rightFragmentsStack.get(rightFragmentsStack.size() - 1);
         } else if (!mainFragmentsStack.isEmpty()) {
@@ -3968,6 +3970,7 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.reloadInterface);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.didSetNewTheme);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.needSetDayNightTheme);
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.invalidateCachedViews);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.needCheckSystemBarColors);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.closeOtherAppActivities);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.didSetPasscode);
@@ -4522,7 +4525,11 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
             }
             drawerLayoutContainer.setBehindKeyboardColor(Theme.getColor(Theme.key_windowBackgroundWhite));
             checkSystemBarColors();
-        } else if (id == NotificationCenter.needSetDayNightTheme) {
+        } else if (id == NotificationCenter.invalidateCachedViews) {
+            invalidateCachedViews(drawerLayoutContainer);
+        }
+
+        else if (id == NotificationCenter.needSetDayNightTheme) {
             boolean instant = false;
             if (Build.VERSION.SDK_INT >= 21 && args[2] != null) {
                 if (themeSwitchImageView.getVisibility() == View.VISIBLE) {
@@ -4590,11 +4597,12 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
             }
             Theme.ThemeInfo theme = (Theme.ThemeInfo) args[0];
             boolean nigthTheme = (Boolean) args[1];
+            boolean chatOnly = args.length >= 7 && (boolean) args[6];
             int accentId = (Integer) args[3];
-            actionBarLayout.animateThemedValues(theme, accentId, nigthTheme, instant);
+            actionBarLayout.animateThemedValues(theme, accentId, nigthTheme, instant, chatOnly);
             if (AndroidUtilities.isTablet()) {
-                layersActionBarLayout.animateThemedValues(theme, accentId, nigthTheme, instant);
-                rightActionBarLayout.animateThemedValues(theme, accentId, nigthTheme, instant);
+                layersActionBarLayout.animateThemedValues(theme, accentId, nigthTheme, instant, chatOnly);
+                rightActionBarLayout.animateThemedValues(theme, accentId, nigthTheme, instant, chatOnly);
             }
         } else if (id == NotificationCenter.notificationsCountUpdated) {
             if (sideMenu != null) {

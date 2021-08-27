@@ -323,7 +323,7 @@ public class WallpaperCell extends FrameLayout {
         checkDrawable = context.getResources().getDrawable(R.drawable.background_selected).mutate();
 
         backgroundPaint = new Paint();
-        backgroundPaint.setColor(Theme.getColor(Theme.key_sharedMedia_photoPlaceholder));
+
     }
 
     protected void onWallpaperClick(Object wallPaper, int index) {

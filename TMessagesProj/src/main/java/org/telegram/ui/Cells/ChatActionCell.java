@@ -473,13 +473,13 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
         }
 
         if (overrideBackground != null) {
-            int color = Theme.getColor(overrideBackground);
+            int color = Theme.getColor(overrideBackground, Theme.CHAT_MASK);
             if (color != overrideColor) {
                 overrideColor = color;
                 overrideColorFilter = new PorterDuffColorFilter(overrideColor, PorterDuff.Mode.MULTIPLY);
             }
             Theme.chat_actionBackgroundPaint.setColor(overrideColor);
-            Theme.chat_actionTextPaint.setColor(Theme.getColor(overrideText));
+            Theme.chat_actionTextPaint.setColor(Theme.getColor(overrideText, Theme.CHAT_MASK));
         }
         if (invalidatePath) {
             invalidatePath = false;

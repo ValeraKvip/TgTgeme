@@ -4571,7 +4571,10 @@
     <string name="RecentStickersShort">Recent</string>
     <string name="ChangeColors">Change colors</string>
     <string name="SelectTheme">Select theme</string>
-    <string name="no_theme">No Theme</string>
+    <string name="no_theme">No\nTheme</string>
     <string name="reset_theme">Reset Theme</string>
     <string name="apply_theme">Apply Theme</string>
+    <string name="DisableChatTheme">%1$s disabled chat theme</string>
+    <string name="ChangeChatTheme">%1$s changed chat theme to %2$s</string>
+    <string name="ApplyInChatTheme">Apply Theme</string>
 </resources>

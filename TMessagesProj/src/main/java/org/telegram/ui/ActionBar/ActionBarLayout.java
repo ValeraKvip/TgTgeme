@@ -26,7 +26,6 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import androidx.annotation.Keep;
 
-import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
@@ -41,7 +40,6 @@ import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
@@ -1679,7 +1677,7 @@ public class ActionBarLayout extends FrameLayout {
         }
     }
 
-    public void animateThemedValues(Theme.ThemeInfo theme, int accentId, boolean nightTheme, boolean instant) {
+    public void animateThemedValues(Theme.ThemeInfo theme, int accentId, boolean nightTheme, boolean instant, boolean chatOnly) {
         if (transitionAnimationInProgress || startedTracking) {
             animateThemeAfterAnimation = true;
             animateSetThemeAfterAnimation = theme;
@@ -1718,7 +1716,13 @@ public class ActionBarLayout extends FrameLayout {
                         theme.setCurrentAccentId(accentId);
                         Theme.saveThemeAccents(theme, true, false, true, false);
                     }
-                    Theme.applyTheme(theme, nightTheme);
+                    if(chatOnly){
+                        Theme.applyChatMask(theme);
+                    }
+                    else{
+                        Theme.applyTheme(theme, nightTheme);
+                    }
+
                 }
                 addEndDescriptions(descriptions);
                 if (fragment.visibleDialog instanceof BottomSheet) {
@@ -1847,7 +1851,7 @@ public class ActionBarLayout extends FrameLayout {
             rebuildAllFragmentViews(rebuildLastAfterAnimation, showLastAfterAnimation);
             rebuildAfterAnimation = false;
         } else if (animateThemeAfterAnimation) {
-            animateThemedValues(animateSetThemeAfterAnimation, animateSetThemeAccentIdAfterAnimation, animateSetThemeNightAfterAnimation, false);
+            animateThemedValues(animateSetThemeAfterAnimation, animateSetThemeAccentIdAfterAnimation, animateSetThemeNightAfterAnimation, false, false);
             animateSetThemeAfterAnimation = null;
             animateThemeAfterAnimation = false;
         }

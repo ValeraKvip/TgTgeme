@@ -116,6 +116,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 
@@ -129,6 +130,8 @@ public class Theme {
     public static final String DEFAULT_BACKGROUND_SLUG = "d";
     public static final String THEME_BACKGROUND_SLUG = "t";
     public static final String COLOR_BACKGROUND_SLUG = "c";
+
+    public static final int CHAT_MASK = 1;
 
     public static class MessageDrawable extends Drawable {
 
@@ -229,21 +232,21 @@ public class Theme {
             Integer gradientColor3;
             boolean animatedGradient;
             if (isOut) {
-                color = getColor(isSelected ? key_chat_outBubbleSelected : key_chat_outBubble);
+                color = getChatColor(isSelected ? key_chat_outBubbleSelected : key_chat_outBubble);
                 gradientColor1 = getCurrentColor(key_chat_outBubbleGradient1);
                 gradientColor2 = getCurrentColor(key_chat_outBubbleGradient2);
                 gradientColor3 = getCurrentColor(key_chat_outBubbleGradient3);
                 Integer val = getCurrentColor(key_chat_outBubbleGradientAnimated);
                 animatedGradient = val != null && val != 0;
             } else {
-                color = getColor(isSelected ? key_chat_inBubbleSelected : key_chat_inBubble);
+                color = getChatColor(isSelected ? key_chat_inBubbleSelected : key_chat_inBubble);
                 gradientColor1 = null;
                 gradientColor2 = null;
                 gradientColor3 = null;
                 animatedGradient = false;
             }
             if (gradientColor1 != null) {
-                color = getColor(key_chat_outBubble);
+                color = getChatColor(key_chat_outBubble);
             }
             if (gradientColor1 == null) {
                 gradientColor1 = 0;
@@ -334,7 +337,7 @@ public class Theme {
             boolean forceSetColor = false;
 
             boolean drawWithShadow = gradientShader == null && !isSelected;
-            int shadowColor = getColor(isOut ? key_chat_outBubbleShadow : key_chat_inBubbleShadow);
+            int shadowColor = getChatColor(isOut ? key_chat_outBubbleShadow : key_chat_inBubbleShadow);
             if (currentBackgroundDrawableRadius[idx2][idx] != newRad || (drawWithShadow && shadowDrawableColor[idx] != shadowColor)) {
                 currentBackgroundDrawableRadius[idx2][idx] = newRad;
                 try {
@@ -383,9 +386,9 @@ public class Theme {
             }
             int color;
             if (isSelected) {
-                color = getColor(isOut ? key_chat_outBubbleSelected : key_chat_inBubbleSelected);
+                color = getChatColor(isOut ? key_chat_outBubbleSelected : key_chat_inBubbleSelected);
             } else {
-                color = getColor(isOut ? key_chat_outBubble : key_chat_inBubble);
+                color = getChatColor(isOut ? key_chat_outBubble : key_chat_inBubble);
             }
             if (backgroundDrawable[idx2][idx] != null && (backgroundDrawableColor[idx2][idx] != color || forceSetColor)) {
                 backgroundDrawable[idx2][idx].setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY));
@@ -470,7 +473,7 @@ public class Theme {
 
                 }
             }
-            int color = getColor(isOut ? key_chat_outBubbleShadow : key_chat_inBubbleShadow);
+            int color = getChatColor(isOut ? key_chat_outBubbleShadow : key_chat_inBubbleShadow);
             if (shadowDrawable[idx] != null && (shadowDrawableColor[idx] != color || forceSetColor)) {
                 shadowDrawable[idx].setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.MULTIPLY));
                 shadowDrawableColor[idx] = color;
@@ -667,7 +670,7 @@ public class Theme {
 
             canvas.drawPath(path, p);
             if (gradientShader != null && isSelected && paintToUse == null) {
-                int color = getColor(key_chat_outBubbleGradientSelectedOverlay);
+                int color = getChatColor(key_chat_outBubbleGradientSelectedOverlay);
                 selectedPaint.setColor(ColorUtils.setAlphaComponent(color, (int) (Color.alpha(color) * alpha / 255f)));
                 canvas.drawPath(path, selectedPaint);
             }
@@ -679,7 +682,7 @@ public class Theme {
                 this.alpha = alpha;
                 paint.setAlpha(alpha);
                 if (isOut) {
-                    selectedPaint.setAlpha((int) (Color.alpha(getColor(key_chat_outBubbleGradientSelectedOverlay)) * (alpha / 255.0f)));
+                    selectedPaint.setAlpha((int) (Color.alpha(getChatColor(key_chat_outBubbleGradientSelectedOverlay)) * (alpha / 255.0f)));
                 }
             }
             if (gradientShader == null) {
@@ -720,6 +723,42 @@ public class Theme {
         private int account = UserConfig.selectedAccount;
         private HashMap<String, LoadingPattern> watingForLoad;
         private static PatternsLoader loader;
+
+        public static void createLoaderForChatThemes(List<ThemeInfo> themeInfos, boolean force) {
+            Utilities.globalQueue.postRunnable(() -> {
+                if (loader != null && !force) {
+                    return;
+                }
+                ArrayList<ThemeAccent> accentsToLoad = null;
+                for (ThemeInfo info : themeInfos) {
+                    if (info == null || info.themeAccents == null || info.themeAccents.isEmpty()) {
+                        continue;
+                    }
+                    for (int a = 0, N = info.themeAccents.size(); a < N; a++) {
+                        ThemeAccent accent = info.themeAccents.get(a);
+                        if (accent.id == DEFALT_THEME_ACCENT_ID || TextUtils.isEmpty(accent.patternSlug)) {
+                            continue;
+                        }
+                        if (accentsToLoad == null) {
+                            accentsToLoad = new ArrayList<>();
+                        }
+
+                        File file = accent.getPathToWallpaper();
+
+                        if (file != null) {
+                            file.delete();
+                        }
+                        ThemeInfo.fillAccentValues(accent, info.info.settings);
+
+                        accent.patternMotion = info.info.settings.wallpaper != null && info.info.settings.wallpaper.settings != null
+                                && info.info.settings.wallpaper.settings.motion;
+
+                        accentsToLoad.add(accent);
+                    }
+                }
+                loader = new PatternsLoader(accentsToLoad);
+            });
+        }
 
         public static void createLoader(boolean force) {
             if (loader != null && !force) {
@@ -774,6 +813,7 @@ public class Theme {
                     ThemeAccent accent = accents.get(a);
                     File wallpaper = accent.getPathToWallpaper();
                     if (wallpaper != null && wallpaper.exists()) {
+
                         accents.remove(a);
                         a--;
                         N--;
@@ -787,9 +827,12 @@ public class Theme {
                     }
                     slugs.add(accent.patternSlug);
                 }
+
+
                 if (slugs == null) {
                     return;
                 }
+
                 TLRPC.TL_account_getMultiWallPapers req = new TLRPC.TL_account_getMultiWallPapers();
                 for (int a = 0, N = slugs.size(); a < N; a++) {
                     TLRPC.TL_inputWallPaperSlug slug = new TLRPC.TL_inputWallPaperSlug();
@@ -797,53 +840,63 @@ public class Theme {
                     req.wallpapers.add(slug);
                 }
                 ConnectionsManager.getInstance(account).sendRequest(req, (response, error) -> {
-                    if (response instanceof TLRPC.Vector) {
-                        TLRPC.Vector res = (TLRPC.Vector) response;
-                        ArrayList<ThemeAccent> createdAccents = null;
-                        for (int b = 0, N2 = res.objects.size(); b < N2; b++) {
-                            TLRPC.WallPaper object = (TLRPC.WallPaper) res.objects.get(b);
-                            if (!(object instanceof TLRPC.TL_wallPaper)) {
-                                continue;
-                            }
-                            TLRPC.TL_wallPaper wallPaper = (TLRPC.TL_wallPaper) object;
-                            if (wallPaper.pattern) {
-                                File patternPath = FileLoader.getPathToAttach(wallPaper.document, true);
-                                Boolean exists = null;
-                                Bitmap patternBitmap = null;
-                                for (int a = 0, N = accents.size(); a < N; a++) {
-                                    ThemeAccent accent = accents.get(a);
-                                    if (accent.patternSlug.equals(wallPaper.slug)) {
-                                        if (exists == null) {
-                                            exists = patternPath.exists();
-                                        }
-                                        if (patternBitmap != null || exists) {
-                                            patternBitmap = createWallpaperForAccent(patternBitmap, "application/x-tgwallpattern".equals(wallPaper.document.mime_type), patternPath, accent);
-                                            if (createdAccents == null) {
-                                                createdAccents = new ArrayList<>();
+                    Utilities.globalQueue.postRunnable(() -> {
+                        if (response instanceof TLRPC.Vector) {
+                            TLRPC.Vector res = (TLRPC.Vector) response;
+                            ArrayList<ThemeAccent> createdAccents = null;
+                            for (int b = 0, N2 = res.objects.size(); b < N2; b++) {
+                                TLRPC.WallPaper object = (TLRPC.WallPaper) res.objects.get(b);
+                                if (!(object instanceof TLRPC.TL_wallPaper)) {
+                                    continue;
+                                }
+                                TLRPC.TL_wallPaper wallPaper = (TLRPC.TL_wallPaper) object;
+
+                                if (wallPaper.pattern) {
+
+                                    File patternPath = FileLoader.getPathToAttach(wallPaper.document, true);
+
+                                    Boolean exists = null;
+                                    Bitmap patternBitmap = null;
+                                    for (int a = 0, N = accents.size(); a < N; a++) {
+                                        ThemeAccent accent = accents.get(a);
+                                        if (accent.patternSlug.equals(wallPaper.slug)) {
+
+                                            if (exists == null) {
+                                                exists = patternPath.exists();
                                             }
-                                            createdAccents.add(accent);
-                                        } else {
-                                            String key = FileLoader.getAttachFileName(wallPaper.document);
-                                            if (watingForLoad == null) {
-                                                watingForLoad = new HashMap<>();
+                                            if (patternBitmap != null || exists) {
+
+                                                patternBitmap = createWallpaperForAccent(patternBitmap, "application/x-tgwallpattern".equals(wallPaper.document.mime_type), patternPath, accent);
+                                                if (createdAccents == null) {
+                                                    createdAccents = new ArrayList<>();
+                                                }
+                                                createdAccents.add(accent);
+                                            } else {
+
+                                                String key = FileLoader.getAttachFileName(wallPaper.document);
+                                                if (watingForLoad == null) {
+                                                    watingForLoad = new HashMap<>();
+                                                }
+                                                LoadingPattern loadingPattern = watingForLoad.get(key);
+                                                if (loadingPattern == null) {
+
+                                                    loadingPattern = new LoadingPattern();
+                                                    loadingPattern.pattern = wallPaper;
+                                                    watingForLoad.put(key, loadingPattern);
+                                                }
+                                                loadingPattern.accents.add(accent);
                                             }
-                                            LoadingPattern loadingPattern = watingForLoad.get(key);
-                                            if (loadingPattern == null) {
-                                                loadingPattern = new LoadingPattern();
-                                                loadingPattern.pattern = wallPaper;
-                                                watingForLoad.put(key, loadingPattern);
-                                            }
-                                            loadingPattern.accents.add(accent);
                                         }
                                     }
-                                }
-                                if (patternBitmap != null) {
-                                    patternBitmap.recycle();
+
+                                    if (patternBitmap != null) {
+                                        patternBitmap.recycle();
+                                    }
                                 }
                             }
+                            checkCurrentWallpaper(createdAccents, true);
                         }
-                        checkCurrentWallpaper(createdAccents, true);
-                    }
+                    });
                 });
             });
         }
@@ -1207,7 +1260,8 @@ public class Theme {
                     currentColors.put(key_chat_outMediaIconSelected, myMessagesAccentColor);
                 }
             }
-            if (isMyMessagesGradientColorsNear) {
+            if (isMyMessagesGradientColorsNear && currentColors.containsKey(key_chat_outLoader)) {
+                //TODO error key 'key_chat_outLoader' not exists
                 int outColor = currentColors.get(key_chat_outLoader);
                 if (AndroidUtilities.getColorDistance(0xffffffff, outColor) < 5000) {
                     isMyMessagesGradientColorsNear = false;
@@ -1474,47 +1528,384 @@ public class Theme {
         }
     }
 
-    public static ThemeInfo getThemeTemplate(){
-        ThemeInfo themeInfo = new ThemeInfo();
-       // themeInfo.name = "Blue";
-      //  themeInfo.assetName = "bluebubbles.attheme";
-        themeInfo.previewBackgroundColor = 0xff95beec;
-        themeInfo.previewInColor = 0xffffffff;
-        themeInfo.previewOutColor = 0xffd0e6ff;
-       // themeInfo.firstAccentIsDefault = true;
-        //themeInfo.currentAccentId = DEFALT_THEME_ACCENT_ID;
-        themeInfo.sortIndex = 10;
-//                themeInfo.setAccentColorOptions(
-//                new int[]{},
-//                        new int[]{},
-//                        new int[]{},
-//                        new int[]{},
-//                        new int[]{},
-//                        new int[]{},
-//                        new int[]{},
-//                        new int[]{},
-//                new String[]{},
-//                new int[]{},
-//                new int[]{}
-//        );
+    public static class WpData {
+        public WpData() {
 
-        themeInfo.setAccentColorOptions(
-                new int[]{0xFF5890C5, 0xFF239853, 0xFFCE5E82, 0xFF7F63C3, 0xFF2491AD, 0xFF299C2F, 0xFF8854B4, 0xFF328ACF, 0xFF43ACC7, 0xFF52AC44, 0xFFCD5F93, 0xFFD28036, 0xFF8366CC, 0xFFCE4E57, 0xFFD3AE40, 0xFF7B88AB},
-                new int[]{0xFFB8E18D, 0xFFFAFBCC, 0xFFFFF9DC, 0xFFC14F6E, 0xFFD1BD1B, 0xFFFFFAC9, 0xFFFCF6D8, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
-                new int[]{0x00000000, 0xFFF2FBC9, 0xFFFBF4DF, 0, 0, 0xFFFDEDB4, 0xFFFCF7B6, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
-                new int[]{0x00000000, 0xFFdfe2a0, 0xFFf1b290, 0xFFd7c1e9, 0xFFd7b89e, 0xFFec9e73, 0xFFcbb0e4, 0xff9bbce7, 0xff91c5ec, 0xff9bc982, 0xffe4a1c1, 0xffe3ae7d, 0xffb8aaea, 0xffeb9c79, 0xffd3bc74, 0xffa0aace},
-                new int[]{0x00000000, 0xFFbad89d, 0xFFeccf94, 0xFFe8bdd6, 0xFFe6dec2, 0xFFe8d085, 0xFFebc8e9, 0xffc0d9f3, 0xffbfdfec, 0xffe0dd93, 0xffe9bed6, 0xffecd5a2, 0xffc5c9ee, 0xfff0bd99, 0xffe9df9e, 0xffcacedd},
-                new int[]{0x00000000, 0xFFe2dea7, 0xFFe7b384, 0xFFd2aee9, 0xFFdac5ae, 0xFFeea677, 0xFFdfa8d1, 0xff95c3eb, 0xffb5e1d9, 0xffbed595, 0xffcca8e1, 0xffdfb076, 0xffb3b1e2, 0xffe79db4, 0xffe0c88b, 0xffa6add2},
-                new int[]{0x00000000, 0xFF9ec790, 0xFFebdea8, 0xFFeccb88, 0xFFe5dcbf, 0xFFede4a9, 0xFFedc8a8, 0xffbbd5e8, 0xffbfdbe8, 0xffd1db97, 0xffefcbd7, 0xffecd694, 0xffdfbeed, 0xfff3b182, 0xffe5d397, 0xffcacee8},
-                new int[]{99, 9, 10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6, 7, 8},
-                new String[]{"", "p-pXcflrmFIBAAAAvXYQk-mCwZU", "JqSUrO0-mFIBAAAAWwTvLzoWGQI", "O-wmAfBPSFADAAAA4zINVfD_bro", "RepJ5uE_SVABAAAAr4d0YhgB850", "-Xc-np9y2VMCAAAARKr0yNNPYW0", "fqv01SQemVIBAAAApND8LDRUhRU", "fqv01SQemVIBAAAApND8LDRUhRU", "RepJ5uE_SVABAAAAr4d0YhgB850", "lp0prF8ISFAEAAAA_p385_CvG0w", "heptcj-hSVACAAAAC9RrMzOa-cs", "PllZ-bf_SFAEAAAA8crRfwZiDNg", "dhf9pceaQVACAAAAbzdVo4SCiZA", "Ujx2TFcJSVACAAAARJ4vLa50MkM", "p-pXcflrmFIBAAAAvXYQk-mCwZU", "dk_wwlghOFACAAAAfz9xrxi6euw"},
-                new int[]{0, 180, 45, 0, 45, 180, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-                new int[]{0, 52, 46, 57, 45, 64, 52, 35, 36, 41, 50, 50, 35, 38, 37, 30}
-        );
+        }
 
-        return themeInfo;
+        public Drawable drawable;
+        public int outBubbleColor;
+        public int inBubbleColor;
     }
 
+    public static WpData loadWallpaperPreview(ThemeInfo info) {
+        HashMap<String, Integer> noAccentColors = new HashMap<>();
+        HashMap<String, Integer> _overrideColors = new HashMap<>();
+
+
+        if (info.assetName != null) {
+            noAccentColors = getThemeFileValues(null, info.assetName, null);
+        }
+
+        _overrideColors.putAll(noAccentColors);
+        ThemeAccent accent = info.getAccent(false);
+        if (accent != null) {
+            accent.fillAccentColors(noAccentColors, _overrideColors);
+        }
+
+        boolean defaultTheme = false;
+        File wallpaperFile;
+
+
+        if (accent != null) {
+            wallpaperFile = accent.getPathToWallpaper();
+        } else {
+            wallpaperFile = null;
+        }
+        int intensity;
+        OverrideWallpaperInfo overrideWallpaper = info.overrideWallpaper;
+        if (overrideWallpaper != null) {
+            intensity = overrideWallpaper != null ? (int) (overrideWallpaper.intensity * 100) : 100;
+        } else {
+            intensity = (int) (accent != null ? (accent.patternIntensity * 100) : info.patternIntensity);
+        }
+
+        Drawable result_wallpaper = null;
+        boolean overrideTheme = overrideWallpaper != null;
+
+        int _previousPhase = 0;
+        int _patternIntensity = intensity;
+        boolean _isPatternWallpaper = true;
+        if (!overrideTheme) {
+
+            Integer backgroundColor = defaultTheme ? null : chatColorsOverride.get(key_chat_wallpaper);
+            Integer gradientToColor3 = chatColorsOverride.get(key_chat_wallpaper_gradient_to3);
+            if (gradientToColor3 == null) {
+                gradientToColor3 = 0;
+            }
+            Integer gradientToColor2 = chatColorsOverride.get(key_chat_wallpaper_gradient_to2);
+            Integer gradientToColor1 = chatColorsOverride.get(key_chat_wallpaper_gradient_to1);
+            if (wallpaperFile != null && wallpaperFile.exists()) {
+                try {
+                    if (backgroundColor != null && gradientToColor1 != null && gradientToColor2 != null) {
+                        MotionBackgroundDrawable motionBackgroundDrawable = new MotionBackgroundDrawable(backgroundColor, gradientToColor1, gradientToColor2, gradientToColor3, false);
+                        motionBackgroundDrawable.setPatternBitmap(_patternIntensity, BitmapFactory.decodeFile(wallpaperFile.getAbsolutePath()));
+                        result_wallpaper = motionBackgroundDrawable;
+                    } else {
+                        result_wallpaper = Drawable.createFromPath(wallpaperFile.getAbsolutePath());
+                    }
+                    _isPatternWallpaper = true;
+                } catch (Throwable e) {
+                    FileLog.e(e);
+                }
+            } else if (backgroundColor != null) {
+                Integer rotation = chatColorsOverride.get(key_chat_wallpaper_gradient_rotation);
+                if (rotation == null) {
+                    rotation = 45;
+                }
+                if (gradientToColor1 != null && gradientToColor2 != null) {
+                    MotionBackgroundDrawable motionBackgroundDrawable = new MotionBackgroundDrawable(backgroundColor, gradientToColor1, gradientToColor2, gradientToColor3, false);
+                    motionBackgroundDrawable.setPhase(_previousPhase);
+                    result_wallpaper = motionBackgroundDrawable;
+                } else if (gradientToColor1 == null || gradientToColor1.equals(backgroundColor)) {
+                    result_wallpaper = new ColorDrawable(backgroundColor);
+                } else {
+                    final int[] colors = {backgroundColor, gradientToColor1};
+                    final BackgroundGradientDrawable.Orientation orientation = BackgroundGradientDrawable.getGradientOrientation(rotation);
+                    final BackgroundGradientDrawable backgroundGradientDrawable = new BackgroundGradientDrawable(orientation, colors);
+                    final BackgroundGradientDrawable.Listener listener = new BackgroundGradientDrawable.ListenerAdapter() {
+                        @Override
+                        public void onSizeReady(int width, int height) {
+                        }
+                    };
+                    backgroundGradientDisposable = backgroundGradientDrawable.startDithering(BackgroundGradientDrawable.Sizes.ofDeviceScreen(), listener, 100);
+                    result_wallpaper = backgroundGradientDrawable;
+                }
+            }
+        }
+        if (result_wallpaper == null) {
+            int selectedColor = overrideWallpaper != null ? overrideWallpaper.color : 0;
+            try {
+                if (overrideWallpaper == null || overrideWallpaper.isDefault()) {
+                    result_wallpaper = createDefaultWallpaper(100, 100);
+
+                } else if (!overrideWallpaper.isColor() || overrideWallpaper.gradientColor1 != 0) {
+                    if (selectedColor != 0 && (!_isPatternWallpaper || overrideWallpaper.gradientColor2 != 0)) {
+                        if (overrideWallpaper.gradientColor1 != 0 && overrideWallpaper.gradientColor2 != 0) {
+                            MotionBackgroundDrawable motionBackgroundDrawable = new MotionBackgroundDrawable(overrideWallpaper.color, overrideWallpaper.gradientColor1, overrideWallpaper.gradientColor2, overrideWallpaper.gradientColor3, false);
+                            motionBackgroundDrawable.setPhase(_previousPhase);
+                            if (_isPatternWallpaper) {
+                                File toFile = new File(ApplicationLoader.getFilesDirFixed(), overrideWallpaper.fileName);
+                                if (toFile.exists()) {
+                                    motionBackgroundDrawable.setPatternBitmap((int) (overrideWallpaper.intensity * 100), loadScreenSizedBitmap(new FileInputStream(toFile), 0));
+                                }
+                            }
+                            result_wallpaper = motionBackgroundDrawable;
+                        } else if (overrideWallpaper.gradientColor1 != 0) {
+                            final int[] colors = {selectedColor, overrideWallpaper.gradientColor1};
+                            final BackgroundGradientDrawable.Orientation orientation = BackgroundGradientDrawable.getGradientOrientation(overrideWallpaper.rotation);
+                            final BackgroundGradientDrawable backgroundGradientDrawable = new BackgroundGradientDrawable(orientation, colors);
+                            final BackgroundGradientDrawable.Listener listener = new BackgroundGradientDrawable.ListenerAdapter() {
+                                @Override
+                                public void onSizeReady(int width, int height) {
+                                    final boolean isOrientationPortrait = AndroidUtilities.displaySize.x <= AndroidUtilities.displaySize.y;
+                                    final boolean isGradientPortrait = width <= height;
+                                    if (isOrientationPortrait == isGradientPortrait) {
+                                        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.didSetNewWallpapper);
+                                    }
+                                }
+                            };
+                            backgroundGradientDrawable.startDithering(BackgroundGradientDrawable.Sizes.ofDeviceScreen(), listener, 100);
+                            result_wallpaper = backgroundGradientDrawable;
+                        } else {
+                            result_wallpaper = new ColorDrawable(selectedColor);
+                        }
+                    } else {
+                        File toFile = new File(ApplicationLoader.getFilesDirFixed(), overrideWallpaper.fileName);
+                        if (toFile.exists()) {
+                            Bitmap bitmap = loadScreenSizedBitmap(new FileInputStream(toFile), 0);
+                            if (bitmap != null) {
+                                result_wallpaper = new BitmapDrawable(bitmap);
+
+                            }
+                        }
+                        if (result_wallpaper == null) {
+                            result_wallpaper = createDefaultWallpaper();
+                        }
+                    }
+                }
+            } catch (Throwable ignore) {
+
+            }
+            if (result_wallpaper == null) {
+                if (selectedColor == 0) {
+                    selectedColor = -2693905;
+                }
+                result_wallpaper = new ColorDrawable(selectedColor);
+            }
+        }
+
+        WpData data = new WpData();
+        data.drawable = result_wallpaper;
+
+        data.inBubbleColor = !_overrideColors.containsKey(Theme.key_chat_inBubble) ? getColor(Theme.key_chat_inBubble) : _overrideColors.get(Theme.key_chat_inBubble);
+
+        data.outBubbleColor = !_overrideColors.containsKey(Theme.key_chat_outBubble) ? getColor(Theme.key_chat_outBubble) : _overrideColors.get(Theme.key_chat_outBubble);
+
+        return data;
+    }
+
+
+    public static void loadChatMaskWallpaper() {
+        if (chatMask == null || chatMaskWallpaper != null) {
+            return;
+        }
+
+        boolean defaultTheme = false;
+        File wallpaperFile;
+
+        ThemeAccent accent = chatMask.getAccent(false);
+        if (accent != null) {
+            wallpaperFile = accent.getPathToWallpaper();
+            isWallpaperInChatMotion = accent.patternMotion;
+        } else {
+            wallpaperFile = null;
+            isWallpaperInChatMotion = false;
+        }
+        int intensity;
+        OverrideWallpaperInfo overrideWallpaper = chatMask.overrideWallpaper;
+        if (overrideWallpaper != null) {
+            intensity = overrideWallpaper != null ? (int) (overrideWallpaper.intensity * 100) : 100;
+        } else {
+            intensity = (int) (accent != null ? (accent.patternIntensity * 100) : chatMask.patternIntensity);
+        }
+
+        Utilities.searchQueue.postRunnable(wallpaperLoadTask = () -> {
+            boolean overrideTheme = (!hasPreviousTheme || isApplyingAccent) && overrideWallpaper != null;
+            patternIntensity = intensity;
+            if (!overrideTheme) {
+
+                Integer backgroundColor = defaultTheme ? null : chatColorsOverride.get(key_chat_wallpaper);
+                Integer gradientToColor3 = chatColorsOverride.get(key_chat_wallpaper_gradient_to3);
+                if (gradientToColor3 == null) {
+                    gradientToColor3 = 0;
+                }
+                Integer gradientToColor2 = chatColorsOverride.get(key_chat_wallpaper_gradient_to2);
+                Integer gradientToColor1 = chatColorsOverride.get(key_chat_wallpaper_gradient_to1);
+                if (wallpaperFile != null && wallpaperFile.exists()) {
+
+                    try {
+                        if (backgroundColor != null && gradientToColor1 != null && gradientToColor2 != null) {
+                            MotionBackgroundDrawable motionBackgroundDrawable = new MotionBackgroundDrawable(backgroundColor, gradientToColor1, gradientToColor2, gradientToColor3, false);
+                            motionBackgroundDrawable.setPatternBitmap(patternIntensity, BitmapFactory.decodeFile(wallpaperFile.getAbsolutePath()));
+                            chatMaskWallpaper = motionBackgroundDrawable;
+                        } else {
+                            chatMaskWallpaper = Drawable.createFromPath(wallpaperFile.getAbsolutePath());
+                        }
+
+                        isCustomTheme = true;
+                        isPatternWallpaper = true;
+                    } catch (Throwable e) {
+                        FileLog.e(e);
+                    }
+                } else if (backgroundColor != null) {
+
+                    Integer rotation = chatColorsOverride.get(key_chat_wallpaper_gradient_rotation);
+                    if (rotation == null) {
+                        rotation = 45;
+                    }
+                    if (gradientToColor1 != null && gradientToColor2 != null) {
+                        MotionBackgroundDrawable motionBackgroundDrawable = new MotionBackgroundDrawable(backgroundColor, gradientToColor1, gradientToColor2, gradientToColor3, false);
+                        motionBackgroundDrawable.setPhase(previousPhase);
+                        chatMaskWallpaper = motionBackgroundDrawable;
+                    } else if (gradientToColor1 == null || gradientToColor1.equals(backgroundColor)) {
+                        chatMaskWallpaper = new ColorDrawable(backgroundColor);
+                    } else {
+                        final int[] colors = {backgroundColor, gradientToColor1};
+                        final BackgroundGradientDrawable.Orientation orientation = BackgroundGradientDrawable.getGradientOrientation(rotation);
+                        final BackgroundGradientDrawable backgroundGradientDrawable = new BackgroundGradientDrawable(orientation, colors);
+                        final BackgroundGradientDrawable.Listener listener = new BackgroundGradientDrawable.ListenerAdapter() {
+                            @Override
+                            public void onSizeReady(int width, int height) {
+                                final boolean isOrientationPortrait = AndroidUtilities.displaySize.x <= AndroidUtilities.displaySize.y;
+                                final boolean isGradientPortrait = width <= height;
+                                if (isOrientationPortrait == isGradientPortrait) {
+                                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.didSetNewWallpapper);
+                                }
+                            }
+                        };
+                        backgroundGradientDisposable = backgroundGradientDrawable.startDithering(BackgroundGradientDrawable.Sizes.ofDeviceScreen(), listener, 100);
+                        chatMaskWallpaper = backgroundGradientDrawable;
+                    }
+                    isCustomTheme = true;
+                } else if (themedWallpaperLink != null) {
+                    try {
+                        File pathToWallpaper = new File(ApplicationLoader.getFilesDirFixed(), Utilities.MD5(themedWallpaperLink) + ".wp");
+                        Bitmap bitmap = loadScreenSizedBitmap(new FileInputStream(pathToWallpaper), 0);
+                        if (bitmap != null) {
+                            themedWallpaper = wallpaper = new BitmapDrawable(bitmap);
+                            isCustomTheme = true;
+                        }
+                    } catch (Exception e) {
+                        FileLog.e(e);
+                    }
+                } else if (themedWallpaperFileOffset > 0 && (currentTheme.pathToFile != null || currentTheme.assetName != null)) {
+                    try {
+                        File file;
+                        if (currentTheme.assetName != null) {
+                            file = getAssetFile(currentTheme.assetName);
+                        } else {
+                            file = new File(currentTheme.pathToFile);
+                        }
+                        Bitmap bitmap = loadScreenSizedBitmap(new FileInputStream(file), themedWallpaperFileOffset);
+                        if (bitmap != null) {
+                            chatMaskWallpaper = new BitmapDrawable(bitmap);
+                            isCustomTheme = true;
+                        }
+                    } catch (Throwable e) {
+                        FileLog.e(e);
+                    }
+                }
+            }
+            if (chatMaskWallpaper == null) {
+                int selectedColor = overrideWallpaper != null ? overrideWallpaper.color : 0;
+                try {
+                    if (overrideWallpaper == null || overrideWallpaper.isDefault()) {
+                        chatMaskWallpaper = createDefaultWallpaper();
+                        isCustomTheme = false;
+                    } else if (!overrideWallpaper.isColor() || overrideWallpaper.gradientColor1 != 0) {
+                        if (selectedColor != 0 && (!isPatternWallpaper || overrideWallpaper.gradientColor2 != 0)) {
+                            if (overrideWallpaper.gradientColor1 != 0 && overrideWallpaper.gradientColor2 != 0) {
+                                MotionBackgroundDrawable motionBackgroundDrawable = new MotionBackgroundDrawable(overrideWallpaper.color, overrideWallpaper.gradientColor1, overrideWallpaper.gradientColor2, overrideWallpaper.gradientColor3, false);
+                                motionBackgroundDrawable.setPhase(previousPhase);
+                                if (isPatternWallpaper) {
+                                    File toFile = new File(ApplicationLoader.getFilesDirFixed(), overrideWallpaper.fileName);
+                                    if (toFile.exists()) {
+                                        motionBackgroundDrawable.setPatternBitmap((int) (overrideWallpaper.intensity * 100), loadScreenSizedBitmap(new FileInputStream(toFile), 0));
+                                        isCustomTheme = true;
+                                    }
+                                }
+                                chatMaskWallpaper = motionBackgroundDrawable;
+                            } else if (overrideWallpaper.gradientColor1 != 0) {
+                                final int[] colors = {selectedColor, overrideWallpaper.gradientColor1};
+                                final BackgroundGradientDrawable.Orientation orientation = BackgroundGradientDrawable.getGradientOrientation(overrideWallpaper.rotation);
+                                final BackgroundGradientDrawable backgroundGradientDrawable = new BackgroundGradientDrawable(orientation, colors);
+                                final BackgroundGradientDrawable.Listener listener = new BackgroundGradientDrawable.ListenerAdapter() {
+                                    @Override
+                                    public void onSizeReady(int width, int height) {
+                                        final boolean isOrientationPortrait = AndroidUtilities.displaySize.x <= AndroidUtilities.displaySize.y;
+                                        final boolean isGradientPortrait = width <= height;
+                                        if (isOrientationPortrait == isGradientPortrait) {
+                                            NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.didSetNewWallpapper);
+                                        }
+                                    }
+                                };
+                                backgroundGradientDisposable = backgroundGradientDrawable.startDithering(BackgroundGradientDrawable.Sizes.ofDeviceScreen(), listener, 100);
+                                chatMaskWallpaper = backgroundGradientDrawable;
+                            } else {
+                                chatMaskWallpaper = new ColorDrawable(selectedColor);
+                            }
+                        } else {
+                            File toFile = new File(ApplicationLoader.getFilesDirFixed(), overrideWallpaper.fileName);
+                            if (toFile.exists()) {
+                                Bitmap bitmap = loadScreenSizedBitmap(new FileInputStream(toFile), 0);
+                                if (bitmap != null) {
+                                    chatMaskWallpaper = new BitmapDrawable(bitmap);
+                                    isCustomTheme = true;
+                                }
+                            }
+                            if (chatMaskWallpaper == null) {
+                                chatMaskWallpaper = createDefaultWallpaper(100,100);
+                                isCustomTheme = false;
+                            }
+                        }
+                    }
+                } catch (Throwable throwable) {
+                    //ignore
+                }
+                if (chatMaskWallpaper == null) {
+                    if (selectedColor == 0) {
+                        selectedColor = -2693905;
+                    }
+                    chatMaskWallpaper = new ColorDrawable(selectedColor);
+                }
+            }
+
+            AndroidUtilities.runOnUIThread(() -> {
+                wallpaperLoadTask = null;
+                createCommonChatResources();
+                applyChatServiceMessageColor(null, null, chatMaskWallpaper);
+                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.didSetNewWallpapper);
+            });
+        });
+    }
+
+    public static ThemeInfo getCurrentInChatTheme() {
+        return chatMask;
+    }
+
+    public static void applyChatMask(ThemeInfo info) {
+        chatMask = info;
+        HashMap<String, Integer> noAccentColors = new HashMap<>();
+        chatColorsOverride.clear();
+        chatMaskWallpaper = null;
+
+        if (chatMask != null) {
+            if (chatMask.assetName != null) {
+                noAccentColors = getThemeFileValues(null, info.assetName, null);
+            }
+            chatColorsOverride.putAll(noAccentColors);
+
+            ThemeAccent accent = chatMask.getAccent(false);
+
+            if (accent != null) {
+                accent.fillAccentColors(noAccentColors, chatColorsOverride);
+            }
+            loadChatMaskWallpaper();
+        }
+        applyChatTheme(false, false);
+        AndroidUtilities.runOnUIThread(() -> NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.didSetNewTheme, false));
+    }
 
     public static class ThemeInfo implements NotificationCenter.NotificationCenterDelegate {
         public String name;
@@ -1575,6 +1966,61 @@ public class Theme {
 
         }
 
+        public static ThemeInfo createFromTL_theme(TLRPC.TL_theme theme) {
+            ThemeInfo themeInfo = new ThemeInfo();
+            themeInfo.info = theme;
+            themeInfo.previewBackgroundColor = 0xff95beec;
+            themeInfo.previewInColor = 0xffffffff;
+            themeInfo.previewOutColor = 0xffd0e6ff;
+            themeInfo.assetName = "bluebubbles.attheme";
+            themeInfo.sortIndex = 10;
+            themeInfo.setAccentColorOptions(
+                    new int[]{0xFF5890C5, 0xFF239853, 0xFFCE5E82, 0xFF7F63C3, 0xFF2491AD, 0xFF299C2F, 0xFF8854B4, 0xFF328ACF, 0xFF43ACC7, 0xFF52AC44, 0xFFCD5F93, 0xFFD28036, 0xFF8366CC, 0xFFCE4E57, 0xFFD3AE40, 0xFF7B88AB},
+                    new int[]{0xFFB8E18D, 0xFFFAFBCC, 0xFFFFF9DC, 0xFFC14F6E, 0xFFD1BD1B, 0xFFFFFAC9, 0xFFFCF6D8, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                    new int[]{0x00000000, 0xFFF2FBC9, 0xFFFBF4DF, 0, 0, 0xFFFDEDB4, 0xFFFCF7B6, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                    new int[]{0x00000000, 0xFFdfe2a0, 0xFFf1b290, 0xFFd7c1e9, 0xFFd7b89e, 0xFFec9e73, 0xFFcbb0e4, 0xff9bbce7, 0xff91c5ec, 0xff9bc982, 0xffe4a1c1, 0xffe3ae7d, 0xffb8aaea, 0xffeb9c79, 0xffd3bc74, 0xffa0aace},
+                    new int[]{0x00000000, 0xFFbad89d, 0xFFeccf94, 0xFFe8bdd6, 0xFFe6dec2, 0xFFe8d085, 0xFFebc8e9, 0xffc0d9f3, 0xffbfdfec, 0xffe0dd93, 0xffe9bed6, 0xffecd5a2, 0xffc5c9ee, 0xfff0bd99, 0xffe9df9e, 0xffcacedd},
+                    new int[]{0x00000000, 0xFFe2dea7, 0xFFe7b384, 0xFFd2aee9, 0xFFdac5ae, 0xFFeea677, 0xFFdfa8d1, 0xff95c3eb, 0xffb5e1d9, 0xffbed595, 0xffcca8e1, 0xffdfb076, 0xffb3b1e2, 0xffe79db4, 0xffe0c88b, 0xffa6add2},
+                    new int[]{0x00000000, 0xFF9ec790, 0xFFebdea8, 0xFFeccb88, 0xFFe5dcbf, 0xFFede4a9, 0xFFedc8a8, 0xffbbd5e8, 0xffbfdbe8, 0xffd1db97, 0xffefcbd7, 0xffecd694, 0xffdfbeed, 0xfff3b182, 0xffe5d397, 0xffcacee8},
+                    new int[]{99, 9, 10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6, 7, 8},
+                    new String[]{"", "p-pXcflrmFIBAAAAvXYQk-mCwZU", "JqSUrO0-mFIBAAAAWwTvLzoWGQI", "O-wmAfBPSFADAAAA4zINVfD_bro", "RepJ5uE_SVABAAAAr4d0YhgB850", "-Xc-np9y2VMCAAAARKr0yNNPYW0", "fqv01SQemVIBAAAApND8LDRUhRU", "fqv01SQemVIBAAAApND8LDRUhRU", "RepJ5uE_SVABAAAAr4d0YhgB850", "lp0prF8ISFAEAAAA_p385_CvG0w", "heptcj-hSVACAAAAC9RrMzOa-cs", "PllZ-bf_SFAEAAAA8crRfwZiDNg", "dhf9pceaQVACAAAAbzdVo4SCiZA", "Ujx2TFcJSVACAAAARJ4vLa50MkM", "p-pXcflrmFIBAAAAvXYQk-mCwZU", "dk_wwlghOFACAAAAfz9xrxi6euw"},
+                    new int[]{0, 180, 45, 0, 45, 180, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                    new int[]{0, 52, 46, 57, 45, 64, 52, 35, 36, 41, 50, 50, 35, 38, 37, 30}
+            );
+
+            themeInfo.themeAccents.clear();
+            ThemeAccent accent = themeInfo.createNewAccent(theme, UserConfig.selectedAccount);
+            themeInfo.setCurrentAccentId(accent.id);
+
+            TLRPC.WallPaper wp = theme.settings.wallpaper;
+            TLRPC.WallPaperSettings wps = wp.settings;
+            OverrideWallpaperInfo wp_override = new OverrideWallpaperInfo();
+
+//        if (wallpaperBg != null) {
+//            wp_override.fileName = wallpaperBg.getName();
+//            wp_override.fileName = wallpaperBg.getName();
+//        }
+
+            wp_override.color = wps.background_color;
+            wp_override.gradientColor1 = wps.second_background_color;
+            wp_override.gradientColor2 = wps.third_background_color;
+            wp_override.gradientColor3 = wps.fourth_background_color;
+            wp_override.rotation = wps.rotation;
+
+            wp_override.slug = wp.slug;
+            wp_override.isBlurred = wps.blur;
+            wp_override.isMotion = wps.motion;
+            wp_override.intensity = wps.intensity;
+            wp_override.wallpaperId = wp.id;
+            wp_override.accessHash = wp.access_hash;
+            wp_override.parentTheme = getTheme("Blue");
+            wp_override.parentAccent = accent;
+
+            accent.overrideWallpaper = wp_override;
+
+            return themeInfo;
+        }
+
         JSONObject getSaveJson() {
             try {
                 JSONObject jsonObject = new JSONObject();
@@ -1607,7 +2053,7 @@ public class Theme {
 
         private void loadOverrideWallpaper(SharedPreferences sharedPreferences, ThemeAccent accent, String key) {
             try {
-                String json = sharedPreferences.getString(key,  null);
+                String json = sharedPreferences.getString(key, null);
                 if (TextUtils.isEmpty(json)) {
                     return;
                 }
@@ -2234,6 +2680,9 @@ public class Theme {
     private static ThemeInfo currentDayTheme;
     private static ThemeInfo defaultTheme;
     private static ThemeInfo previousTheme;
+    private static ThemeInfo chatMask;
+    private static Drawable chatMaskWallpaper;
+    private static boolean isWallpaperInChatMotion;
     private static boolean changingWallpaper;
     private static boolean hasPreviousTheme;
     private static boolean isApplyingAccent;
@@ -2256,7 +2705,7 @@ public class Theme {
     private static int serviceMessage2Color;
     private static int serviceSelectedMessage2Color;
     public static int currentColor;
-    private static Drawable wallpaper;
+    public static Drawable wallpaper;
     private static Drawable themedWallpaper;
     private static int themedWallpaperFileOffset;
     private static String themedWallpaperLink;
@@ -4012,7 +4461,7 @@ public class Theme {
         defaultColors.put(key_statisticChartNightIconColor, 0xff8E8E93);
         defaultColors.put(key_statisticChartChevronColor, 0xffD2D5D7);
         defaultColors.put(key_statisticChartHighlightColor, 0x20ececec);
-        defaultColors.put(key_statisticChartPopupBackground,0xffffffff);
+        defaultColors.put(key_statisticChartPopupBackground, 0xffffffff);
 
         defaultColors.put(key_statisticChartLine_blue, 0xff327FE5);
         defaultColors.put(key_statisticChartLine_green, 0xff61C752);
@@ -4088,7 +4537,6 @@ public class Theme {
         defaultColors.put(key_voipgroup_overlayAlertMutedByAdmin2, 0xff2F5078);
         defaultColors.put(key_voipgroup_mutedByAdminMuteButton, 0x7F78A3FF);
         defaultColors.put(key_voipgroup_mutedByAdminMuteButtonDisabled, 0x3378A3FF);
-
 
 
         fallbackKeys.put(key_chat_inAdminText, key_chat_inTimeText);
@@ -4397,18 +4845,18 @@ public class Theme {
         themeInfo.currentAccentId = DEFALT_THEME_ACCENT_ID;
         themeInfo.sortIndex = 1;
         themeInfo.setAccentColorOptions(
-                new int[]    { 0xFF5890C5,                     0xFF239853,                    0xFFCE5E82,                    0xFF7F63C3,                    0xFF2491AD,                    0xFF299C2F,                    0xFF8854B4,                    0xFF328ACF,                    0xFF43ACC7,                    0xFF52AC44,                    0xFFCD5F93,                    0xFFD28036,                    0xFF8366CC,                    0xFFCE4E57,                    0xFFD3AE40,                    0xFF7B88AB },
-                new int[]    { 0xFFB8E18D,                     0xFFFAFBCC,                    0xFFFFF9DC,                    0xFFC14F6E,                    0xFFD1BD1B,                    0xFFFFFAC9,                    0xFFFCF6D8,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000 },
-                new int[]    { 0x00000000,                     0xFFF2FBC9,                    0xFFFBF4DF, 	                         0,	                             0,                    0xFFFDEDB4,                    0xFFFCF7B6,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000 },
-                new int[]    { 0x00000000,                     0xFFdfe2a0,                    0xFFf1b290,                    0xFFd7c1e9,                    0xFFd7b89e,                    0xFFec9e73,                    0xFFcbb0e4,                    0xff9bbce7,                    0xff91c5ec,                    0xff9bc982,                    0xffe4a1c1,                    0xffe3ae7d,                    0xffb8aaea,                    0xffeb9c79,                    0xffd3bc74,                    0xffa0aace },
-                new int[]    { 0x00000000,                     0xFFbad89d,                    0xFFeccf94,                    0xFFe8bdd6,                    0xFFe6dec2,                    0xFFe8d085,                    0xFFebc8e9,                    0xffc0d9f3,                    0xffbfdfec,                    0xffe0dd93,                    0xffe9bed6,                    0xffecd5a2,                    0xffc5c9ee,                    0xfff0bd99,                    0xffe9df9e,                    0xffcacedd },
-                new int[]    { 0x00000000,                     0xFFe2dea7,                    0xFFe7b384,                    0xFFd2aee9,                    0xFFdac5ae,                    0xFFeea677,                    0xFFdfa8d1,                    0xff95c3eb,                    0xffb5e1d9,                    0xffbed595,                    0xffcca8e1,                    0xffdfb076,                    0xffb3b1e2,                    0xffe79db4,                    0xffe0c88b,                    0xffa6add2 },
-                new int[]    { 0x00000000,                     0xFF9ec790,                    0xFFebdea8,                    0xFFeccb88,                    0xFFe5dcbf,                    0xFFede4a9,                    0xFFedc8a8,                    0xffbbd5e8,                    0xffbfdbe8,                    0xffd1db97,                    0xffefcbd7,                    0xffecd694,                    0xffdfbeed,                    0xfff3b182,                    0xffe5d397,                    0xffcacee8 },
-                new int[]    {         99,                              9,                            10,                            11,                            12,                            13,                            14,                             0,                             1,                             2,                             3,                             4,                             5,                             6,                             7,                             8 },
-                new String[] {         "",  "p-pXcflrmFIBAAAAvXYQk-mCwZU", "JqSUrO0-mFIBAAAAWwTvLzoWGQI", "O-wmAfBPSFADAAAA4zINVfD_bro", "RepJ5uE_SVABAAAAr4d0YhgB850", "-Xc-np9y2VMCAAAARKr0yNNPYW0", "fqv01SQemVIBAAAApND8LDRUhRU", "fqv01SQemVIBAAAApND8LDRUhRU", "RepJ5uE_SVABAAAAr4d0YhgB850", "lp0prF8ISFAEAAAA_p385_CvG0w", "heptcj-hSVACAAAAC9RrMzOa-cs", "PllZ-bf_SFAEAAAA8crRfwZiDNg", "dhf9pceaQVACAAAAbzdVo4SCiZA", "Ujx2TFcJSVACAAAARJ4vLa50MkM", "p-pXcflrmFIBAAAAvXYQk-mCwZU", "dk_wwlghOFACAAAAfz9xrxi6euw" },
-                new int[]    {          0,                            180,                            45,                             0,                            45,                           180,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0 },
-                new int[]    {          0,                             52,                            46,                            57,                            45,                            64,                            52,                            35,                            36,                            41,                            50,                            50,                            35,                            38,                            37,                            30 }
-                );
+                new int[]{0xFF5890C5, 0xFF239853, 0xFFCE5E82, 0xFF7F63C3, 0xFF2491AD, 0xFF299C2F, 0xFF8854B4, 0xFF328ACF, 0xFF43ACC7, 0xFF52AC44, 0xFFCD5F93, 0xFFD28036, 0xFF8366CC, 0xFFCE4E57, 0xFFD3AE40, 0xFF7B88AB},
+                new int[]{0xFFB8E18D, 0xFFFAFBCC, 0xFFFFF9DC, 0xFFC14F6E, 0xFFD1BD1B, 0xFFFFFAC9, 0xFFFCF6D8, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                new int[]{0x00000000, 0xFFF2FBC9, 0xFFFBF4DF, 0, 0, 0xFFFDEDB4, 0xFFFCF7B6, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                new int[]{0x00000000, 0xFFdfe2a0, 0xFFf1b290, 0xFFd7c1e9, 0xFFd7b89e, 0xFFec9e73, 0xFFcbb0e4, 0xff9bbce7, 0xff91c5ec, 0xff9bc982, 0xffe4a1c1, 0xffe3ae7d, 0xffb8aaea, 0xffeb9c79, 0xffd3bc74, 0xffa0aace},
+                new int[]{0x00000000, 0xFFbad89d, 0xFFeccf94, 0xFFe8bdd6, 0xFFe6dec2, 0xFFe8d085, 0xFFebc8e9, 0xffc0d9f3, 0xffbfdfec, 0xffe0dd93, 0xffe9bed6, 0xffecd5a2, 0xffc5c9ee, 0xfff0bd99, 0xffe9df9e, 0xffcacedd},
+                new int[]{0x00000000, 0xFFe2dea7, 0xFFe7b384, 0xFFd2aee9, 0xFFdac5ae, 0xFFeea677, 0xFFdfa8d1, 0xff95c3eb, 0xffb5e1d9, 0xffbed595, 0xffcca8e1, 0xffdfb076, 0xffb3b1e2, 0xffe79db4, 0xffe0c88b, 0xffa6add2},
+                new int[]{0x00000000, 0xFF9ec790, 0xFFebdea8, 0xFFeccb88, 0xFFe5dcbf, 0xFFede4a9, 0xFFedc8a8, 0xffbbd5e8, 0xffbfdbe8, 0xffd1db97, 0xffefcbd7, 0xffecd694, 0xffdfbeed, 0xfff3b182, 0xffe5d397, 0xffcacee8},
+                new int[]{99, 9, 10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6, 7, 8},
+                new String[]{"", "p-pXcflrmFIBAAAAvXYQk-mCwZU", "JqSUrO0-mFIBAAAAWwTvLzoWGQI", "O-wmAfBPSFADAAAA4zINVfD_bro", "RepJ5uE_SVABAAAAr4d0YhgB850", "-Xc-np9y2VMCAAAARKr0yNNPYW0", "fqv01SQemVIBAAAApND8LDRUhRU", "fqv01SQemVIBAAAApND8LDRUhRU", "RepJ5uE_SVABAAAAr4d0YhgB850", "lp0prF8ISFAEAAAA_p385_CvG0w", "heptcj-hSVACAAAAC9RrMzOa-cs", "PllZ-bf_SFAEAAAA8crRfwZiDNg", "dhf9pceaQVACAAAAbzdVo4SCiZA", "Ujx2TFcJSVACAAAARJ4vLa50MkM", "p-pXcflrmFIBAAAAvXYQk-mCwZU", "dk_wwlghOFACAAAAfz9xrxi6euw"},
+                new int[]{0, 180, 45, 0, 45, 180, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                new int[]{0, 52, 46, 57, 45, 64, 52, 35, 36, 41, 50, 50, 35, 38, 37, 30}
+        );
         themes.add(currentDayTheme = currentTheme = defaultTheme = themeInfo);
         themesDict.put("Blue", themeInfo);
 
@@ -4420,18 +4868,18 @@ public class Theme {
         themeInfo.previewOutColor = 0xff82a8e3;
         themeInfo.sortIndex = 3;
         themeInfo.setAccentColorOptions(
-                new int[]    {                    0xFF927BD4,                    0xFF698AFB,                    0xFF23A7F0,                    0xFF7B71D1,                    0xFF69B955,                    0xFF2990EA,                    0xFF7082E9,                    0xFF66BAED,                    0xff3685fa,                    0xff46c8ed,                    0xff64AC5F,                    0xffeb7cb1,                    0xffee902a,                    0xffa281f0,                    0xffd34324,                    0xffeebd34,                    0xff7f8fab,                    0xff3581e3 },
-                new int[]    {                    0xFF9D5C99,                    0xFF635545,                    0xFF31818B,                    0xFFAD6426,                    0xFF4A7034,                    0xFF335D82,                    0xFF36576F,                    0xFF597563,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000 },
-                new int[]    {                    0xFF604DA8,                    0xFF685D4C,                    0xFF1B6080,                    0xFF99354E,                    0xFF275D3B,                    0xFF317A98,                    0xFF376E87,                    0xFF5E7370,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000 },
-                new int[]    {                    0xFF271e2e,                    0xFF171a22,                    0xFF071e1f,                    0xFF100f13,                    0xFF0e1811,                    0xFF0b131c,                    0xFF1d2129,                    0xFF202c2a,                    0xff0e141a,                    0xff162325,                    0xff161d15,                    0xff24191e,                    0xff251b13,                    0xff1f1d29,                    0xff22160e,                    0xff272115,                    0xff171a1b,                    0xff0e141a },
-                new int[]    {                    0xFF110e13,                    0xFF26262e,                    0xFF141d26,                    0xFF221a27,                    0xFF1f2818,                    0xFF192330,                    0xFF12161a,                    0xFF141a1e,                    0xff172431,                    0xff0e1718,                    0xff172719,                    0xff23171c,                    0xff201408,                    0xff14131c,                    0xff2d1d16,                    0xff1a160d,                    0xff212328,                    0xff172431 },
-                new int[]    {                    0xFF2b1e2b,                    0xFF15151b,                    0xFF0c151a,                    0xFF0e0f13,                    0xFF0b170f,                    0xFF131822,                    0xFF17242d,                    0xFF16202b,                    0xff0f171e,                    0xff1e2e2e,                    0xff141e14,                    0xff2b1929,                    0xff2e1f15,                    0xff292331,                    0xff23140c,                    0xff292414,                    0xff181a1d,                    0xff0f171e },
-                new int[]    {                    0xFF161227,                    0xFF1a1916,                    0xFF0d272c,                    0xFF271d29,                    0xFF171d19,                    0xFF172331,                    0xFF111521,                    0xFF051717,                    0xff141c2b,                    0xff121f1f,                    0xff1c261a,                    0xff1f141d,                    0xff1b130a,                    0xff17131b,                    0xff2d1924,                    0xff1e170e,                    0xff212228,                    0xff141c2b },
-                new int[]    {                            11,                            12,                            13,                            14,                            15,                            16,                            17,                            18,                             0,                             1,                             2,                             3,                             4,                             5,                             6,                             7,                             8,                             9 },
-                new String[] { "O-wmAfBPSFADAAAA4zINVfD_bro", "RepJ5uE_SVABAAAAr4d0YhgB850", "dk_wwlghOFACAAAAfz9xrxi6euw", "9LW_RcoOSVACAAAAFTk3DTyXN-M", "PllZ-bf_SFAEAAAA8crRfwZiDNg", "-Xc-np9y2VMCAAAARKr0yNNPYW0", "kO4jyq55SFABAAAA0WEpcLfahXk", "CJNyxPMgSVAEAAAAvW9sMwc51cw", "fqv01SQemVIBAAAApND8LDRUhRU", "RepJ5uE_SVABAAAAr4d0YhgB850", "CJNyxPMgSVAEAAAAvW9sMwc51cw", "9LW_RcoOSVACAAAAFTk3DTyXN-M", "9GcNVISdSVADAAAAUcw5BYjELW4", "F5oWoCs7QFACAAAAgf2bD_mg8Bw", "9ShF73d1MFIIAAAAjWnm8_ZMe8Q", "3rX-PaKbSFACAAAAEiHNvcEm6X4", "dk_wwlghOFACAAAAfz9xrxi6euw", "fqv01SQemVIBAAAApND8LDRUhRU" },
-                new int[]    {                           225,                            45,                           225,                           135,                            45,                           225,                            45,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0 },
-                new int[]    {                            40,                            40,                            31,                            50,                            25,                            34,                            35,                            35,                            38,                            29,                            24,                            34,                            34,                            31,                            29,                            37,                            21,                            38 }
-                );
+                new int[]{0xFF927BD4, 0xFF698AFB, 0xFF23A7F0, 0xFF7B71D1, 0xFF69B955, 0xFF2990EA, 0xFF7082E9, 0xFF66BAED, 0xff3685fa, 0xff46c8ed, 0xff64AC5F, 0xffeb7cb1, 0xffee902a, 0xffa281f0, 0xffd34324, 0xffeebd34, 0xff7f8fab, 0xff3581e3},
+                new int[]{0xFF9D5C99, 0xFF635545, 0xFF31818B, 0xFFAD6426, 0xFF4A7034, 0xFF335D82, 0xFF36576F, 0xFF597563, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                new int[]{0xFF604DA8, 0xFF685D4C, 0xFF1B6080, 0xFF99354E, 0xFF275D3B, 0xFF317A98, 0xFF376E87, 0xFF5E7370, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                new int[]{0xFF271e2e, 0xFF171a22, 0xFF071e1f, 0xFF100f13, 0xFF0e1811, 0xFF0b131c, 0xFF1d2129, 0xFF202c2a, 0xff0e141a, 0xff162325, 0xff161d15, 0xff24191e, 0xff251b13, 0xff1f1d29, 0xff22160e, 0xff272115, 0xff171a1b, 0xff0e141a},
+                new int[]{0xFF110e13, 0xFF26262e, 0xFF141d26, 0xFF221a27, 0xFF1f2818, 0xFF192330, 0xFF12161a, 0xFF141a1e, 0xff172431, 0xff0e1718, 0xff172719, 0xff23171c, 0xff201408, 0xff14131c, 0xff2d1d16, 0xff1a160d, 0xff212328, 0xff172431},
+                new int[]{0xFF2b1e2b, 0xFF15151b, 0xFF0c151a, 0xFF0e0f13, 0xFF0b170f, 0xFF131822, 0xFF17242d, 0xFF16202b, 0xff0f171e, 0xff1e2e2e, 0xff141e14, 0xff2b1929, 0xff2e1f15, 0xff292331, 0xff23140c, 0xff292414, 0xff181a1d, 0xff0f171e},
+                new int[]{0xFF161227, 0xFF1a1916, 0xFF0d272c, 0xFF271d29, 0xFF171d19, 0xFF172331, 0xFF111521, 0xFF051717, 0xff141c2b, 0xff121f1f, 0xff1c261a, 0xff1f141d, 0xff1b130a, 0xff17131b, 0xff2d1924, 0xff1e170e, 0xff212228, 0xff141c2b},
+                new int[]{11, 12, 13, 14, 15, 16, 17, 18, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+                new String[]{"O-wmAfBPSFADAAAA4zINVfD_bro", "RepJ5uE_SVABAAAAr4d0YhgB850", "dk_wwlghOFACAAAAfz9xrxi6euw", "9LW_RcoOSVACAAAAFTk3DTyXN-M", "PllZ-bf_SFAEAAAA8crRfwZiDNg", "-Xc-np9y2VMCAAAARKr0yNNPYW0", "kO4jyq55SFABAAAA0WEpcLfahXk", "CJNyxPMgSVAEAAAAvW9sMwc51cw", "fqv01SQemVIBAAAApND8LDRUhRU", "RepJ5uE_SVABAAAAr4d0YhgB850", "CJNyxPMgSVAEAAAAvW9sMwc51cw", "9LW_RcoOSVACAAAAFTk3DTyXN-M", "9GcNVISdSVADAAAAUcw5BYjELW4", "F5oWoCs7QFACAAAAgf2bD_mg8Bw", "9ShF73d1MFIIAAAAjWnm8_ZMe8Q", "3rX-PaKbSFACAAAAEiHNvcEm6X4", "dk_wwlghOFACAAAAfz9xrxi6euw", "fqv01SQemVIBAAAApND8LDRUhRU"},
+                new int[]{225, 45, 225, 135, 45, 225, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                new int[]{40, 40, 31, 50, 25, 34, 35, 35, 38, 29, 24, 34, 34, 31, 29, 37, 21, 38}
+        );
         themes.add(themeInfo);
         themesDict.put("Dark Blue", currentNightTheme = themeInfo);
 
@@ -4443,18 +4891,18 @@ public class Theme {
         themeInfo.previewOutColor = 0xff6ca1eb;
         themeInfo.sortIndex = 5;
         themeInfo.setAccentColorOptions(
-                new int[]    {                    0xFF40B1E2,                    0xFF41B05D,                    0xFFCE8C20,                    0xFF57A3EB,                    0xFFDE8534,                    0xFFCC6189,                    0xFF3490EB,                    0xFF43ACC7,                    0xFF52AC44,                    0xFFCD5F93,                    0xFFD28036,                    0xFF8366CC,                    0xFFCE4E57,                    0xFFD3AE40,                    0xFF7B88AB },
-                new int[]    {                    0xFF319FCA,                    0xFF28A359,                    0xFF8C5A3F,                    0xFF3085D3,                    0xFFC95870,                    0xFF7871CD,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000 },
-                new int[]    {                    0xFF4EBEE2,                    0xFF6BBC59,                    0xFF9E563C,                    0xFF48C2D8,                    0xFFD87047,                    0xFFBE6EAF,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000 },
-                new int[]    {                    0xFFc5e2f0,                    0xFFdadea9,                    0xFFd6c9a5,                    0xFFe3f3f3,                    0xFFeee5b0,                    0xFFe5dfec,                    0xffe0e7ed,                    0xffbfe0eb,                    0xffc2e0af,                    0xffefd9e4,                    0xfff1dfbd,                    0xffe1dbec,                    0xffedd8d8,                    0xffebe1cd,                    0xffdcdee5 },
-                new int[]    {                    0xFFe8f4f3,                    0xFFbce3ac,                    0xFFe6dbaf,                    0xFFc8e6ee,                    0xFFeebeaa,                    0xFFe1c6ec,                    0xffbed7f3,                    0xffbfe0eb,                    0xffcbe19a,                    0xffecc6d9,                    0xffe8c79b,                    0xffbdc1ec,                    0xffeecac0,                    0xffebe2b5,                    0xffc3cadf },
-                new int[]    {                    0xFFb4daf0,                    0xFFcde7a9,                    0xFFe8c091,                    0xFFd9eff3,                    0xFFeecf92,                    0xFFf6eaf6,                    0xffe0e8f3,                    0xffcaebec,                    0xffb8de89,                    0xfff1d8e6,                    0xfff3d7a6,                    0xffd6d8f5,                    0xffedddcd,                    0xffebdcc9,                    0xffe7edf1 },
-                new int[]    {                    0xFFcff0ef,                    0xFFa8cf9b,                    0xFFe1d09f,                    0xFFb4d6e8,                    0xFFeeaf87,                    0xFFe5c5cf,                    0xffc8dbf3,                    0xffaedceb,                    0xffcee5a2,                    0xfff0c0d9,                    0xffdfb48e,                    0xffbdbaf2,                    0xfff1c9bb,                    0xffe7d7ae,                    0xffc5c6da },
-                new int[]    {                             9,                            10,                            11,                            12,                            13,                            14,                             0,                             1,                             2,                             3,                             4,                             5,                             6,                             7,                             8 },
-                new String[] { "MIo6r0qGSFAFAAAAtL8TsDzNX60", "dhf9pceaQVACAAAAbzdVo4SCiZA", "fqv01SQemVIBAAAApND8LDRUhRU", "p-pXcflrmFIBAAAAvXYQk-mCwZU", "JqSUrO0-mFIBAAAAWwTvLzoWGQI", "F5oWoCs7QFACAAAAgf2bD_mg8Bw", "fqv01SQemVIBAAAApND8LDRUhRU", "RepJ5uE_SVABAAAAr4d0YhgB850", "PllZ-bf_SFAEAAAA8crRfwZiDNg", "pgJfpFNRSFABAAAACDT8s5sEjfc", "ptuUd96JSFACAAAATobI23sPpz0", "dhf9pceaQVACAAAAbzdVo4SCiZA", "JqSUrO0-mFIBAAAAWwTvLzoWGQI", "9iklpvIPQVABAAAAORQXKur_Eyc", "F5oWoCs7QFACAAAAgf2bD_mg8Bw" },
-                new int[]    {                           315,                           315,                           225,                           315,                             0,                           180,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0 },
-                new int[]    {                            50,                            50,                            58,                            47,                            46,                            50,                            49,                            46,                            51,                            50,                            49,                            34,                            54,                            50,                            40 }
-                );
+                new int[]{0xFF40B1E2, 0xFF41B05D, 0xFFCE8C20, 0xFF57A3EB, 0xFFDE8534, 0xFFCC6189, 0xFF3490EB, 0xFF43ACC7, 0xFF52AC44, 0xFFCD5F93, 0xFFD28036, 0xFF8366CC, 0xFFCE4E57, 0xFFD3AE40, 0xFF7B88AB},
+                new int[]{0xFF319FCA, 0xFF28A359, 0xFF8C5A3F, 0xFF3085D3, 0xFFC95870, 0xFF7871CD, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                new int[]{0xFF4EBEE2, 0xFF6BBC59, 0xFF9E563C, 0xFF48C2D8, 0xFFD87047, 0xFFBE6EAF, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                new int[]{0xFFc5e2f0, 0xFFdadea9, 0xFFd6c9a5, 0xFFe3f3f3, 0xFFeee5b0, 0xFFe5dfec, 0xffe0e7ed, 0xffbfe0eb, 0xffc2e0af, 0xffefd9e4, 0xfff1dfbd, 0xffe1dbec, 0xffedd8d8, 0xffebe1cd, 0xffdcdee5},
+                new int[]{0xFFe8f4f3, 0xFFbce3ac, 0xFFe6dbaf, 0xFFc8e6ee, 0xFFeebeaa, 0xFFe1c6ec, 0xffbed7f3, 0xffbfe0eb, 0xffcbe19a, 0xffecc6d9, 0xffe8c79b, 0xffbdc1ec, 0xffeecac0, 0xffebe2b5, 0xffc3cadf},
+                new int[]{0xFFb4daf0, 0xFFcde7a9, 0xFFe8c091, 0xFFd9eff3, 0xFFeecf92, 0xFFf6eaf6, 0xffe0e8f3, 0xffcaebec, 0xffb8de89, 0xfff1d8e6, 0xfff3d7a6, 0xffd6d8f5, 0xffedddcd, 0xffebdcc9, 0xffe7edf1},
+                new int[]{0xFFcff0ef, 0xFFa8cf9b, 0xFFe1d09f, 0xFFb4d6e8, 0xFFeeaf87, 0xFFe5c5cf, 0xffc8dbf3, 0xffaedceb, 0xffcee5a2, 0xfff0c0d9, 0xffdfb48e, 0xffbdbaf2, 0xfff1c9bb, 0xffe7d7ae, 0xffc5c6da},
+                new int[]{9, 10, 11, 12, 13, 14, 0, 1, 2, 3, 4, 5, 6, 7, 8},
+                new String[]{"MIo6r0qGSFAFAAAAtL8TsDzNX60", "dhf9pceaQVACAAAAbzdVo4SCiZA", "fqv01SQemVIBAAAApND8LDRUhRU", "p-pXcflrmFIBAAAAvXYQk-mCwZU", "JqSUrO0-mFIBAAAAWwTvLzoWGQI", "F5oWoCs7QFACAAAAgf2bD_mg8Bw", "fqv01SQemVIBAAAApND8LDRUhRU", "RepJ5uE_SVABAAAAr4d0YhgB850", "PllZ-bf_SFAEAAAA8crRfwZiDNg", "pgJfpFNRSFABAAAACDT8s5sEjfc", "ptuUd96JSFACAAAATobI23sPpz0", "dhf9pceaQVACAAAAbzdVo4SCiZA", "JqSUrO0-mFIBAAAAWwTvLzoWGQI", "9iklpvIPQVABAAAAORQXKur_Eyc", "F5oWoCs7QFACAAAAgf2bD_mg8Bw"},
+                new int[]{315, 315, 225, 315, 0, 180, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                new int[]{50, 50, 58, 47, 46, 50, 49, 46, 51, 50, 49, 34, 54, 50, 40}
+        );
         themes.add(themeInfo);
         themesDict.put("Arctic Blue", themeInfo);
 
@@ -4466,18 +4914,18 @@ public class Theme {
         themeInfo.previewOutColor = 0xff7cb2fe;
         themeInfo.sortIndex = 2;
         themeInfo.setAccentColorOptions(
-                new int[]    { 0xFF56A2C9, 0xFFCC6E83, 0xFFD08E47, 0xFFCC6462, 0xFF867CD2, 0xFF4C91DF, 0xFF57B4D9, 0xFF54B169, 0xFFD9BF3F, 0xFFCC6462, 0xFFCC6E83, 0xFF9B7BD2, 0xFFD79144, 0xFF7B88AB },
-                new int[]    { 0xFF6580DC, 0xFF6C6DD2, 0xFFCB5481, 0xFFC34A4A, 0xFF5C8EDF, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
-                new int[]    { 0xFF3EC1D6, 0xFFC86994, 0xFFDBA12F, 0xFFD08E3B, 0xFF51B5CB, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
-                new int[]    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
-                new int[]    { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },
+                new int[]{0xFF56A2C9, 0xFFCC6E83, 0xFFD08E47, 0xFFCC6462, 0xFF867CD2, 0xFF4C91DF, 0xFF57B4D9, 0xFF54B169, 0xFFD9BF3F, 0xFFCC6462, 0xFFCC6E83, 0xFF9B7BD2, 0xFFD79144, 0xFF7B88AB},
+                new int[]{0xFF6580DC, 0xFF6C6DD2, 0xFFCB5481, 0xFFC34A4A, 0xFF5C8EDF, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                new int[]{0xFF3EC1D6, 0xFFC86994, 0xFFDBA12F, 0xFFD08E3B, 0xFF51B5CB, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                new int[]{0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                new int[]{0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
                 null,
                 null,
-                new int[]    {          9,         10,         11,         12,         13,          0,          1,          2,          3,          4,          5,          6,          7,          8 },
-                new String[] {         "",         "",         "",         "",         "",         "",         "",         "",         "",         "",         "",         "",         "",         "" },
-                new int[]    {          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0 },
-                new int[]    {          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0,          0 }
-                );
+                new int[]{9, 10, 11, 12, 13, 0, 1, 2, 3, 4, 5, 6, 7, 8},
+                new String[]{"", "", "", "", "", "", "", "", "", "", "", "", "", ""},
+                new int[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                new int[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+        );
         themes.add(themeInfo);
         themesDict.put("Day", themeInfo);
 
@@ -4489,18 +4937,18 @@ public class Theme {
         themeInfo.previewOutColor = 0xff75A2E6;
         themeInfo.sortIndex = 4;
         themeInfo.setAccentColorOptions(
-                new int[]    {                    0xFF6ABE3F,                    0xFF8D78E3,                    0xFFDE5E7E,                    0xFF5977E8,                    0xFFDBC11A,                    0xff3e88f7,                    0xff4ab5d3,                    0xff4ab841,                    0xffd95576,                    0xffe27d2b,                    0xff936cda,                    0xffd04336,                    0xffe8ae1c,                    0xff7988a3 },
-                new int[]    {                    0xFF8A5294,                    0xFFB46C1B,                    0xFFAF4F6F,                    0xFF266E8D,                    0xFF744EB7,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000 },
-                new int[]    {                    0xFF6855BB,                    0xFFA53B4A,                    0xFF62499C,                    0xFF2F919D,                    0xFF298B95,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000,                    0x00000000 },
-                new int[]    {                    0xFF16131c,                    0xFF1e1118,                    0xFF0f0b10,                    0xFF090c0c,                    0xFF071519,                    0xff0d0e17,                    0xff111b1c,                    0xff0c110c,                    0xff0e0b0d,                    0xff1d160f,                    0xff09090a,                    0xff1c1210,                    0xff1d1b18,                    0xff0e1012 },
-                new int[]    {                    0xFF201827,                    0xFF100f13,                    0xFF1b151a,                    0xFF141f22,                    0xFF0c0c0f,                    0xff090a0c,                    0xff0a0e0e,                    0xff080908,                    0xff1a1618,                    0xff13100d,                    0xff1e1a21,                    0xff0f0d0c,                    0xff0c0b08,                    0xff070707 },
-                new int[]    {                    0xFF0e0b13,                    0xFF211623,                    0xFF130e12,                    0xFF0d0f11,                    0xFF10191f,                    0xff181c28,                    0xff142121,                    0xff121812,                    0xff130e11,                    0xff1a130f,                    0xff0b0a0b,                    0xff120d0b,                    0xff15140f,                    0xff101214 },
-                new int[]    {                    0xFF1e192a,                    0xFF111016,                    0xFF21141a,                    0xFF111a1b,                    0xFF0a0d13,                    0xff0e0f12,                    0xff070c0b,                    0xff0b0d0b,                    0xff22121e,                    0xff0f0c0c,                    0xff110f17,                    0xff070606,                    0xff0c0a0a,                    0xff09090b },
-                new int[]    {                             9,                            10,                            11,                            12,                            13,                             0,                             1,                             2,                             3,                             4,                             5,                             6,                             7,                             8 },
-                new String[] { "YIxYGEALQVADAAAAA3QbEH0AowY", "9LW_RcoOSVACAAAAFTk3DTyXN-M", "O-wmAfBPSFADAAAA4zINVfD_bro", "F5oWoCs7QFACAAAAgf2bD_mg8Bw", "-Xc-np9y2VMCAAAARKr0yNNPYW0", "fqv01SQemVIBAAAApND8LDRUhRU", "F5oWoCs7QFACAAAAgf2bD_mg8Bw", "ptuUd96JSFACAAAATobI23sPpz0", "p-pXcflrmFIBAAAAvXYQk-mCwZU", "Nl8Pg2rBQVACAAAA25Lxtb8SDp0", "dhf9pceaQVACAAAAbzdVo4SCiZA", "9GcNVISdSVADAAAAUcw5BYjELW4", "9LW_RcoOSVACAAAAFTk3DTyXN-M", "dk_wwlghOFACAAAAfz9xrxi6euw" },
-                new int[]    {                            45,                           135,                             0,                           180,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0,                             0 },
-                new int[]    {                            34,                            47,                            52,                            48,                            54,                            50,                            37,                            56,                            48,                            49,                            40,                            64,                            38,                            48 }
-                );
+                new int[]{0xFF6ABE3F, 0xFF8D78E3, 0xFFDE5E7E, 0xFF5977E8, 0xFFDBC11A, 0xff3e88f7, 0xff4ab5d3, 0xff4ab841, 0xffd95576, 0xffe27d2b, 0xff936cda, 0xffd04336, 0xffe8ae1c, 0xff7988a3},
+                new int[]{0xFF8A5294, 0xFFB46C1B, 0xFFAF4F6F, 0xFF266E8D, 0xFF744EB7, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                new int[]{0xFF6855BB, 0xFFA53B4A, 0xFF62499C, 0xFF2F919D, 0xFF298B95, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
+                new int[]{0xFF16131c, 0xFF1e1118, 0xFF0f0b10, 0xFF090c0c, 0xFF071519, 0xff0d0e17, 0xff111b1c, 0xff0c110c, 0xff0e0b0d, 0xff1d160f, 0xff09090a, 0xff1c1210, 0xff1d1b18, 0xff0e1012},
+                new int[]{0xFF201827, 0xFF100f13, 0xFF1b151a, 0xFF141f22, 0xFF0c0c0f, 0xff090a0c, 0xff0a0e0e, 0xff080908, 0xff1a1618, 0xff13100d, 0xff1e1a21, 0xff0f0d0c, 0xff0c0b08, 0xff070707},
+                new int[]{0xFF0e0b13, 0xFF211623, 0xFF130e12, 0xFF0d0f11, 0xFF10191f, 0xff181c28, 0xff142121, 0xff121812, 0xff130e11, 0xff1a130f, 0xff0b0a0b, 0xff120d0b, 0xff15140f, 0xff101214},
+                new int[]{0xFF1e192a, 0xFF111016, 0xFF21141a, 0xFF111a1b, 0xFF0a0d13, 0xff0e0f12, 0xff070c0b, 0xff0b0d0b, 0xff22121e, 0xff0f0c0c, 0xff110f17, 0xff070606, 0xff0c0a0a, 0xff09090b},
+                new int[]{9, 10, 11, 12, 13, 0, 1, 2, 3, 4, 5, 6, 7, 8},
+                new String[]{"YIxYGEALQVADAAAAA3QbEH0AowY", "9LW_RcoOSVACAAAAFTk3DTyXN-M", "O-wmAfBPSFADAAAA4zINVfD_bro", "F5oWoCs7QFACAAAAgf2bD_mg8Bw", "-Xc-np9y2VMCAAAARKr0yNNPYW0", "fqv01SQemVIBAAAApND8LDRUhRU", "F5oWoCs7QFACAAAAgf2bD_mg8Bw", "ptuUd96JSFACAAAATobI23sPpz0", "p-pXcflrmFIBAAAAvXYQk-mCwZU", "Nl8Pg2rBQVACAAAA25Lxtb8SDp0", "dhf9pceaQVACAAAAbzdVo4SCiZA", "9GcNVISdSVADAAAAUcw5BYjELW4", "9LW_RcoOSVACAAAAFTk3DTyXN-M", "dk_wwlghOFACAAAAfz9xrxi6euw"},
+                new int[]{45, 135, 0, 180, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                new int[]{34, 47, 52, 48, 54, 50, 37, 56, 48, 49, 40, 64, 38, 48}
+        );
         themes.add(themeInfo);
         themesDict.put("Night", themeInfo);
 
@@ -6718,8 +7166,8 @@ public class Theme {
                         }
                         themes.remove(info);
                         //TODO without any reason drop the app on start
-//                        File file = new File(info.pathToFile);
-//                        file.delete();
+                        File file = new File(info.pathToFile);
+                        file.delete();
                         boolean isNightTheme = false;
                         if (currentDayTheme == info) {
                             currentDayTheme = defaultTheme;
@@ -7969,187 +8417,213 @@ public class Theme {
 
     }
 
+    private static HashMap<String, Integer> chatColorsOverride = new HashMap<>();
+
+//    public static int getNonAnimatedColor(String key) {
+//        return getColor(key, null, true);
+//    }
+
+
+    public static int getChatColor(String key) {
+        if (chatMask == null) {
+            return getColor(key);
+        }
+
+        if (!chatColorsOverride.containsKey(key)) {
+            String fallbackKey = fallbackKeys.get(key);
+            if (fallbackKey != null && chatColorsOverride.containsKey(fallbackKey)) {
+                return chatColorsOverride.get(fallbackKey);
+            }
+            return getColor(key);
+        }
+
+
+        return chatColorsOverride.get(key);
+    }
+
     public static void applyChatTheme(boolean fontsOnly, boolean bg) {
         if (chat_msgTextPaint == null) {
             return;
         }
 
         if (chat_msgInDrawable != null && !fontsOnly) {
-            chat_gamePaint.setColor(getColor(key_chat_previewGameText));
-            chat_durationPaint.setColor(getColor(key_chat_previewDurationText));
-            chat_botButtonPaint.setColor(getColor(key_chat_botButtonText));
-            chat_urlPaint.setColor(getColor(key_chat_linkSelectBackground));
-            chat_botProgressPaint.setColor(getColor(key_chat_botProgress));
-            chat_deleteProgressPaint.setColor(getColor(key_chat_secretTimeText));
-            chat_textSearchSelectionPaint.setColor(getColor(key_chat_textSelectBackground));
-            chat_msgErrorPaint.setColor(getColor(key_chat_sentError));
-            chat_statusPaint.setColor(getColor(key_chat_status));
-            chat_statusRecordPaint.setColor(getColor(key_chat_status));
-            chat_actionTextPaint.setColor(getColor(key_chat_serviceText));
-            chat_actionTextPaint.linkColor = getColor(key_chat_serviceLink);
-            chat_contextResult_titleTextPaint.setColor(getColor(key_windowBackgroundWhiteBlackText));
-            chat_composeBackgroundPaint.setColor(getColor(key_chat_messagePanelBackground));
-            chat_timeBackgroundPaint.setColor(getColor(key_chat_mediaTimeBackground));
+            chat_gamePaint.setColor(getChatColor(key_chat_previewGameText));
+            chat_durationPaint.setColor(getChatColor(key_chat_previewDurationText));
+            chat_botButtonPaint.setColor(getChatColor(key_chat_botButtonText));
+            chat_urlPaint.setColor(getChatColor(key_chat_linkSelectBackground));
+            chat_botProgressPaint.setColor(getChatColor(key_chat_botProgress));
+            chat_deleteProgressPaint.setColor(getChatColor(key_chat_secretTimeText));
+            chat_textSearchSelectionPaint.setColor(getChatColor(key_chat_textSelectBackground));
+            chat_msgErrorPaint.setColor(getChatColor(key_chat_sentError));
+            chat_statusPaint.setColor(getChatColor(key_chat_status));
+            chat_statusRecordPaint.setColor(getChatColor(key_chat_status));
+            chat_actionTextPaint.setColor(getChatColor(key_chat_serviceText));
+            chat_actionTextPaint.linkColor = getChatColor(key_chat_serviceLink);
+            chat_contextResult_titleTextPaint.setColor(getChatColor(key_windowBackgroundWhiteBlackText));
+            chat_composeBackgroundPaint.setColor(getChatColor(key_chat_messagePanelBackground));
+            chat_timeBackgroundPaint.setColor(getChatColor(key_chat_mediaTimeBackground));
 
-            setDrawableColorByKey(chat_msgNoSoundDrawable, key_chat_mediaTimeText);
-            setDrawableColorByKey(chat_msgInDrawable, key_chat_inBubble);
-            setDrawableColorByKey(chat_msgInSelectedDrawable, key_chat_inBubbleSelected);
-            setDrawableColorByKey(chat_msgInMediaDrawable, key_chat_inBubble);
-            setDrawableColorByKey(chat_msgInMediaSelectedDrawable, key_chat_inBubbleSelected);
-            setDrawableColorByKey(chat_msgOutCheckDrawable, key_chat_outSentCheck);
-            setDrawableColorByKey(chat_msgOutCheckSelectedDrawable, key_chat_outSentCheckSelected);
-            setDrawableColorByKey(chat_msgOutCheckReadDrawable, key_chat_outSentCheckRead);
-            setDrawableColorByKey(chat_msgOutCheckReadSelectedDrawable, key_chat_outSentCheckReadSelected);
-            setDrawableColorByKey(chat_msgOutHalfCheckDrawable, key_chat_outSentCheckRead);
-            setDrawableColorByKey(chat_msgOutHalfCheckSelectedDrawable, key_chat_outSentCheckReadSelected);
-            setDrawableColorByKey(chat_msgOutClockDrawable, key_chat_outSentClock);
-            setDrawableColorByKey(chat_msgOutSelectedClockDrawable, key_chat_outSentClockSelected);
-            setDrawableColorByKey(chat_msgInClockDrawable, key_chat_inSentClock);
-            setDrawableColorByKey(chat_msgInSelectedClockDrawable, key_chat_inSentClockSelected);
-            setDrawableColorByKey(chat_msgMediaCheckDrawable, key_chat_mediaSentCheck);
-            setDrawableColorByKey(chat_msgMediaHalfCheckDrawable, key_chat_mediaSentCheck);
-            setDrawableColorByKey(chat_msgMediaClockDrawable, key_chat_mediaSentClock);
-            setDrawableColorByKey(chat_msgStickerCheckDrawable, key_chat_serviceText);
-            setDrawableColorByKey(chat_msgStickerHalfCheckDrawable, key_chat_serviceText);
-            setDrawableColorByKey(chat_msgStickerClockDrawable, key_chat_serviceText);
-            setDrawableColorByKey(chat_msgStickerViewsDrawable, key_chat_serviceText);
-            setDrawableColorByKey(chat_msgStickerRepliesDrawable, key_chat_serviceText);
-            setDrawableColorByKey(chat_shareIconDrawable, key_chat_serviceIcon);
-            setDrawableColorByKey(chat_replyIconDrawable, key_chat_serviceIcon);
-            setDrawableColorByKey(chat_goIconDrawable, key_chat_serviceIcon);
-            setDrawableColorByKey(chat_botInlineDrawable, key_chat_serviceIcon);
-            setDrawableColorByKey(chat_botLinkDrawalbe, key_chat_serviceIcon);
-            setDrawableColorByKey(chat_msgInViewsDrawable, key_chat_inViews);
-            setDrawableColorByKey(chat_msgInViewsSelectedDrawable, key_chat_inViewsSelected);
-            setDrawableColorByKey(chat_msgOutViewsDrawable, key_chat_outViews);
-            setDrawableColorByKey(chat_msgOutViewsSelectedDrawable, key_chat_outViewsSelected);
-            setDrawableColorByKey(chat_msgInRepliesDrawable, key_chat_inViews);
-            setDrawableColorByKey(chat_msgInRepliesSelectedDrawable, key_chat_inViewsSelected);
-            setDrawableColorByKey(chat_msgOutRepliesDrawable, key_chat_outViews);
-            setDrawableColorByKey(chat_msgOutRepliesSelectedDrawable, key_chat_outViewsSelected);
-            setDrawableColorByKey(chat_msgInPinnedDrawable, key_chat_inViews);
-            setDrawableColorByKey(chat_msgInPinnedSelectedDrawable, key_chat_inViewsSelected);
-            setDrawableColorByKey(chat_msgOutPinnedDrawable, key_chat_outViews);
-            setDrawableColorByKey(chat_msgOutPinnedSelectedDrawable, key_chat_outViewsSelected);
-            setDrawableColorByKey(chat_msgMediaPinnedDrawable, key_chat_mediaViews);
-            setDrawableColorByKey(chat_msgStickerPinnedDrawable, key_chat_serviceText);
-            setDrawableColorByKey(chat_msgMediaViewsDrawable, key_chat_mediaViews);
-            setDrawableColorByKey(chat_msgMediaRepliesDrawable, key_chat_mediaViews);
-            setDrawableColorByKey(chat_msgInMenuDrawable, key_chat_inMenu);
-            setDrawableColorByKey(chat_msgInMenuSelectedDrawable, key_chat_inMenuSelected);
-            setDrawableColorByKey(chat_msgOutMenuDrawable, key_chat_outMenu);
-            setDrawableColorByKey(chat_msgOutMenuSelectedDrawable, key_chat_outMenuSelected);
-            setDrawableColorByKey(chat_msgMediaMenuDrawable, key_chat_mediaMenu);
-            setDrawableColorByKey(chat_msgOutInstantDrawable, key_chat_outInstant);
-            setDrawableColorByKey(chat_msgInInstantDrawable, key_chat_inInstant);
-            setDrawableColorByKey(chat_msgErrorDrawable, key_chat_sentErrorIcon);
-            setDrawableColorByKey(chat_muteIconDrawable, key_chat_muteIcon);
-            setDrawableColorByKey(chat_lockIconDrawable, key_chat_lockIcon);
-            setDrawableColorByKey(chat_msgBroadcastDrawable, key_chat_outBroadcast);
-            setDrawableColorByKey(chat_msgBroadcastMediaDrawable, key_chat_mediaBroadcast);
-            setDrawableColorByKey(chat_inlineResultFile, key_chat_inlineResultIcon);
-            setDrawableColorByKey(chat_inlineResultAudio, key_chat_inlineResultIcon);
-            setDrawableColorByKey(chat_inlineResultLocation, key_chat_inlineResultIcon);
-            setDrawableColorByKey(chat_commentDrawable, key_chat_inInstant);
-            setDrawableColorByKey(chat_commentStickerDrawable, key_chat_serviceIcon);
-            setDrawableColorByKey(chat_commentArrowDrawable, key_chat_inInstant);
+            setDrawableColor(chat_msgNoSoundDrawable, getChatColor(key_chat_mediaTimeText));
+            setDrawableColor(chat_msgInDrawable, getChatColor(key_chat_inBubble));//key_chat_inBubble
+            setDrawableColor(chat_msgOutDrawable, getChatColor(key_chat_outBubble));//
+            setDrawableColor(chat_msgInSelectedDrawable, getChatColor(key_chat_inBubbleSelected));
+            setDrawableColor(chat_msgInMediaDrawable, getChatColor(key_chat_inBubble));
+            setDrawableColor(chat_msgInMediaSelectedDrawable, getChatColor(key_chat_inBubbleSelected));
+            setDrawableColor(chat_msgOutCheckDrawable, getChatColor(key_chat_outSentCheck));
+            setDrawableColor(chat_msgOutCheckSelectedDrawable, getChatColor(key_chat_outSentCheckSelected));
+            setDrawableColor(chat_msgOutCheckReadDrawable, getChatColor(key_chat_outSentCheckRead));
+            setDrawableColor(chat_msgOutCheckReadSelectedDrawable, getChatColor(key_chat_outSentCheckReadSelected));
+            setDrawableColor(chat_msgOutHalfCheckDrawable, getChatColor(key_chat_outSentCheckRead));
+            setDrawableColor(chat_msgOutHalfCheckSelectedDrawable, getChatColor(key_chat_outSentCheckReadSelected));
+            setDrawableColor(chat_msgOutClockDrawable, getChatColor(key_chat_outSentClock));
+            setDrawableColor(chat_msgOutSelectedClockDrawable, getChatColor(key_chat_outSentClockSelected));
+            setDrawableColor(chat_msgInClockDrawable, getChatColor(key_chat_inSentClock));
+            setDrawableColor(chat_msgInSelectedClockDrawable, getChatColor(key_chat_inSentClockSelected));
+            setDrawableColor(chat_msgMediaCheckDrawable, getChatColor(key_chat_mediaSentCheck));
+            setDrawableColor(chat_msgMediaHalfCheckDrawable, getChatColor(key_chat_mediaSentCheck));
+            setDrawableColor(chat_msgMediaClockDrawable, getChatColor(key_chat_mediaSentClock));
+            setDrawableColor(chat_msgStickerCheckDrawable, getChatColor(key_chat_serviceText));
+            setDrawableColor(chat_msgStickerHalfCheckDrawable, getChatColor(key_chat_serviceText));
+            setDrawableColor(chat_msgStickerClockDrawable, getChatColor(key_chat_serviceText));
+            setDrawableColor(chat_msgStickerViewsDrawable, getChatColor(key_chat_serviceText));
+            setDrawableColor(chat_msgStickerRepliesDrawable, getChatColor(key_chat_serviceText));
+            setDrawableColor(chat_shareIconDrawable, getChatColor(key_chat_serviceIcon));
+            setDrawableColor(chat_replyIconDrawable, getChatColor(key_chat_serviceIcon));
+            setDrawableColor(chat_goIconDrawable, getChatColor(key_chat_serviceIcon));
+            setDrawableColor(chat_botInlineDrawable, getChatColor(key_chat_serviceIcon));
+            setDrawableColor(chat_botLinkDrawalbe, getChatColor(key_chat_serviceIcon));
+            setDrawableColor(chat_msgInViewsDrawable, getChatColor(key_chat_inViews));
+            setDrawableColor(chat_msgInViewsSelectedDrawable, getChatColor(key_chat_inViewsSelected));
+            setDrawableColor(chat_msgOutViewsDrawable, getChatColor(key_chat_outViews));
+            setDrawableColor(chat_msgOutViewsSelectedDrawable, getChatColor(key_chat_outViewsSelected));
+            setDrawableColor(chat_msgInRepliesDrawable, getChatColor(key_chat_inViews));
+            setDrawableColor(chat_msgInRepliesSelectedDrawable, getChatColor(key_chat_inViewsSelected));
+            setDrawableColor(chat_msgOutRepliesDrawable, getChatColor(key_chat_outViews));
+            setDrawableColor(chat_msgOutRepliesSelectedDrawable, getChatColor(key_chat_outViewsSelected));
+            setDrawableColor(chat_msgInPinnedDrawable, getChatColor(key_chat_inViews));
+            setDrawableColor(chat_msgInPinnedSelectedDrawable, getChatColor(key_chat_inViewsSelected));
+            setDrawableColor(chat_msgOutPinnedDrawable, getChatColor(key_chat_outViews));
+            setDrawableColor(chat_msgOutPinnedSelectedDrawable, getChatColor(key_chat_outViewsSelected));
+            setDrawableColor(chat_msgMediaPinnedDrawable, getChatColor(key_chat_mediaViews));
+            setDrawableColor(chat_msgStickerPinnedDrawable, getChatColor(key_chat_serviceText));
+            setDrawableColor(chat_msgMediaViewsDrawable, getChatColor(key_chat_mediaViews));
+            setDrawableColor(chat_msgMediaRepliesDrawable, getChatColor(key_chat_mediaViews));
+            setDrawableColor(chat_msgInMenuDrawable, getChatColor(key_chat_inMenu));
+            setDrawableColor(chat_msgInMenuSelectedDrawable, getChatColor(key_chat_inMenuSelected));
+            setDrawableColor(chat_msgOutMenuDrawable, getChatColor(key_chat_outMenu));
+            setDrawableColor(chat_msgOutMenuSelectedDrawable, getChatColor(key_chat_outMenuSelected));
+            setDrawableColor(chat_msgMediaMenuDrawable, getChatColor(key_chat_mediaMenu));
+            setDrawableColor(chat_msgOutInstantDrawable, getChatColor(key_chat_outInstant));
+            setDrawableColor(chat_msgInInstantDrawable, getChatColor(key_chat_inInstant));
+            setDrawableColor(chat_msgErrorDrawable, getChatColor(key_chat_sentErrorIcon));
+            setDrawableColor(chat_muteIconDrawable, getChatColor(key_chat_muteIcon));
+            setDrawableColor(chat_lockIconDrawable, getChatColor(key_chat_lockIcon));
+            setDrawableColor(chat_msgBroadcastDrawable, getChatColor(key_chat_outBroadcast));
+            setDrawableColor(chat_msgBroadcastMediaDrawable, getChatColor(key_chat_mediaBroadcast));
+            setDrawableColor(chat_inlineResultFile, getChatColor(key_chat_inlineResultIcon));
+            setDrawableColor(chat_inlineResultAudio, getChatColor(key_chat_inlineResultIcon));
+            setDrawableColor(chat_inlineResultLocation, getChatColor(key_chat_inlineResultIcon));
+            setDrawableColor(chat_commentDrawable, getChatColor(key_chat_inInstant));
+            setDrawableColor(chat_commentStickerDrawable, getChatColor(key_chat_serviceIcon));
+            setDrawableColor(chat_commentArrowDrawable, getChatColor(key_chat_inInstant));
 
             for (int a = 0; a < 2; a++) {
-                setDrawableColorByKey(chat_msgInCallDrawable[a], key_chat_inInstant);
-                setDrawableColorByKey(chat_msgInCallSelectedDrawable[a], key_chat_inInstantSelected);
-                setDrawableColorByKey(chat_msgOutCallDrawable[a], key_chat_outInstant);
-                setDrawableColorByKey(chat_msgOutCallSelectedDrawable[a], key_chat_outInstantSelected);
+                setDrawableColor(chat_msgInCallDrawable[a], getChatColor(key_chat_inInstant));
+                setDrawableColor(chat_msgInCallSelectedDrawable[a], getChatColor(key_chat_inInstantSelected));
+                setDrawableColor(chat_msgOutCallDrawable[a], getChatColor(key_chat_outInstant));
+                setDrawableColor(chat_msgOutCallSelectedDrawable[a], getChatColor(key_chat_outInstantSelected));
             }
 
-            setDrawableColorByKey(chat_msgCallUpGreenDrawable, key_chat_outGreenCall);
-            setDrawableColorByKey(chat_msgCallDownRedDrawable, key_chat_inRedCall);
-            setDrawableColorByKey(chat_msgCallDownGreenDrawable, key_chat_inGreenCall);
+            setDrawableColor(chat_msgCallUpGreenDrawable, getChatColor(key_chat_outGreenCall));
+            setDrawableColor(chat_msgCallDownRedDrawable, getChatColor(key_chat_inRedCall));
+            setDrawableColor(chat_msgCallDownGreenDrawable, getChatColor(key_chat_inGreenCall));
 
-            setDrawableColorByKey(calllog_msgCallUpRedDrawable, key_calls_callReceivedRedIcon);
-            setDrawableColorByKey(calllog_msgCallUpGreenDrawable, key_calls_callReceivedGreenIcon);
-            setDrawableColorByKey(calllog_msgCallDownRedDrawable, key_calls_callReceivedRedIcon);
-            setDrawableColorByKey(calllog_msgCallDownGreenDrawable, key_calls_callReceivedGreenIcon);
+            setDrawableColor(calllog_msgCallUpRedDrawable, getChatColor(key_calls_callReceivedRedIcon));
+            setDrawableColor(calllog_msgCallUpGreenDrawable, getChatColor(key_calls_callReceivedGreenIcon));
+            setDrawableColor(calllog_msgCallDownRedDrawable, getChatColor(key_calls_callReceivedRedIcon));
+            setDrawableColor(calllog_msgCallDownGreenDrawable, getChatColor(key_calls_callReceivedGreenIcon));
 
             for (int i = 0; i < chat_status_drawables.length; i++) {
-                setDrawableColorByKey(chat_status_drawables[i], key_chats_actionMessage);
+                setDrawableColor(chat_status_drawables[i], getChatColor(key_chats_actionMessage));
             }
 
             for (int a = 0; a < 2; a++) {
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[a][0], getColor(key_chat_outLoader), false);
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[a][0], getColor(key_chat_outMediaIcon), true);
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[a][1], getColor(key_chat_outLoaderSelected), false);
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[a][1], getColor(key_chat_outMediaIconSelected), true);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[a][0], getChatColor(key_chat_outLoader), false);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[a][0], getChatColor(key_chat_outMediaIcon), true);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[a][1], getChatColor(key_chat_outLoaderSelected), false);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[a][1], getChatColor(key_chat_outMediaIconSelected), true);
 
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[2 + a][0], getColor(key_chat_inLoader), false);
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[2 + a][0], getColor(key_chat_inMediaIcon), true);
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[2 + a][1], getColor(key_chat_inLoaderSelected), false);
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[2 + a][1], getColor(key_chat_inMediaIconSelected), true);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[2 + a][0], getChatColor(key_chat_inLoader), false);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[2 + a][0], getChatColor(key_chat_inMediaIcon), true);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[2 + a][1], getChatColor(key_chat_inLoaderSelected), false);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[2 + a][1], getChatColor(key_chat_inMediaIconSelected), true);
 
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[4 + a][0], getColor(key_chat_mediaLoaderPhoto), false);
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[4 + a][0], getColor(key_chat_mediaLoaderPhotoIcon), true);
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[4 + a][1], getColor(key_chat_mediaLoaderPhotoSelected), false);
-                setCombinedDrawableColor(chat_fileMiniStatesDrawable[4 + a][1], getColor(key_chat_mediaLoaderPhotoIconSelected), true);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[4 + a][0], getChatColor(key_chat_mediaLoaderPhoto), false);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[4 + a][0], getChatColor(key_chat_mediaLoaderPhotoIcon), true);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[4 + a][1], getChatColor(key_chat_mediaLoaderPhotoSelected), false);
+                setCombinedDrawableColor(chat_fileMiniStatesDrawable[4 + a][1], getChatColor(key_chat_mediaLoaderPhotoIconSelected), true);
             }
 
             for (int a = 0; a < 5; a++) {
-                setCombinedDrawableColor(chat_fileStatesDrawable[a][0], getColor(key_chat_outLoader), false);
-                setCombinedDrawableColor(chat_fileStatesDrawable[a][0], getColor(key_chat_outMediaIcon), true);
-                setCombinedDrawableColor(chat_fileStatesDrawable[a][1], getColor(key_chat_outLoaderSelected), false);
-                setCombinedDrawableColor(chat_fileStatesDrawable[a][1], getColor(key_chat_outMediaIconSelected), true);
-                setCombinedDrawableColor(chat_fileStatesDrawable[5 + a][0], getColor(key_chat_inLoader), false);
-                setCombinedDrawableColor(chat_fileStatesDrawable[5 + a][0], getColor(key_chat_inMediaIcon), true);
-                setCombinedDrawableColor(chat_fileStatesDrawable[5 + a][1], getColor(key_chat_inLoaderSelected), false);
-                setCombinedDrawableColor(chat_fileStatesDrawable[5 + a][1], getColor(key_chat_inMediaIconSelected), true);
+                setCombinedDrawableColor(chat_fileStatesDrawable[a][0], getChatColor(key_chat_outLoader), false);
+                setCombinedDrawableColor(chat_fileStatesDrawable[a][0], getChatColor(key_chat_outMediaIcon), true);
+                setCombinedDrawableColor(chat_fileStatesDrawable[a][1], getChatColor(key_chat_outLoaderSelected), false);
+                setCombinedDrawableColor(chat_fileStatesDrawable[a][1], getChatColor(key_chat_outMediaIconSelected), true);
+                setCombinedDrawableColor(chat_fileStatesDrawable[5 + a][0], getChatColor(key_chat_inLoader), false);
+                setCombinedDrawableColor(chat_fileStatesDrawable[5 + a][0], getChatColor(key_chat_inMediaIcon), true);
+                setCombinedDrawableColor(chat_fileStatesDrawable[5 + a][1], getChatColor(key_chat_inLoaderSelected), false);
+                setCombinedDrawableColor(chat_fileStatesDrawable[5 + a][1], getChatColor(key_chat_inMediaIconSelected), true);
             }
             for (int a = 0; a < 4; a++) {
-                setCombinedDrawableColor(chat_photoStatesDrawables[a][0], getColor(key_chat_mediaLoaderPhoto), false);
-                setCombinedDrawableColor(chat_photoStatesDrawables[a][0], getColor(key_chat_mediaLoaderPhotoIcon), true);
-                setCombinedDrawableColor(chat_photoStatesDrawables[a][1], getColor(key_chat_mediaLoaderPhotoSelected), false);
-                setCombinedDrawableColor(chat_photoStatesDrawables[a][1], getColor(key_chat_mediaLoaderPhotoIconSelected), true);
+                setCombinedDrawableColor(chat_photoStatesDrawables[a][0], getChatColor(key_chat_mediaLoaderPhoto), false);
+                setCombinedDrawableColor(chat_photoStatesDrawables[a][0], getChatColor(key_chat_mediaLoaderPhotoIcon), true);
+                setCombinedDrawableColor(chat_photoStatesDrawables[a][1], getChatColor(key_chat_mediaLoaderPhotoSelected), false);
+                setCombinedDrawableColor(chat_photoStatesDrawables[a][1], getChatColor(key_chat_mediaLoaderPhotoIconSelected), true);
             }
             for (int a = 0; a < 2; a++) {
-                setCombinedDrawableColor(chat_photoStatesDrawables[7 + a][0], getColor(key_chat_outLoaderPhoto), false);
-                setCombinedDrawableColor(chat_photoStatesDrawables[7 + a][0], getColor(key_chat_outLoaderPhotoIcon), true);
-                setCombinedDrawableColor(chat_photoStatesDrawables[7 + a][1], getColor(key_chat_outLoaderPhotoSelected), false);
-                setCombinedDrawableColor(chat_photoStatesDrawables[7 + a][1], getColor(key_chat_outLoaderPhotoIconSelected), true);
-                setCombinedDrawableColor(chat_photoStatesDrawables[10 + a][0], getColor(key_chat_inLoaderPhoto), false);
-                setCombinedDrawableColor(chat_photoStatesDrawables[10 + a][0], getColor(key_chat_inLoaderPhotoIcon), true);
-                setCombinedDrawableColor(chat_photoStatesDrawables[10 + a][1], getColor(key_chat_inLoaderPhotoSelected), false);
-                setCombinedDrawableColor(chat_photoStatesDrawables[10 + a][1], getColor(key_chat_inLoaderPhotoIconSelected), true);
+                setCombinedDrawableColor(chat_photoStatesDrawables[7 + a][0], getChatColor(key_chat_outLoaderPhoto), false);
+                setCombinedDrawableColor(chat_photoStatesDrawables[7 + a][0], getChatColor(key_chat_outLoaderPhotoIcon), true);
+                setCombinedDrawableColor(chat_photoStatesDrawables[7 + a][1], getChatColor(key_chat_outLoaderPhotoSelected), false);
+                setCombinedDrawableColor(chat_photoStatesDrawables[7 + a][1], getChatColor(key_chat_outLoaderPhotoIconSelected), true);
+                setCombinedDrawableColor(chat_photoStatesDrawables[10 + a][0], getChatColor(key_chat_inLoaderPhoto), false);
+                setCombinedDrawableColor(chat_photoStatesDrawables[10 + a][0], getChatColor(key_chat_inLoaderPhotoIcon), true);
+                setCombinedDrawableColor(chat_photoStatesDrawables[10 + a][1], getChatColor(key_chat_inLoaderPhotoSelected), false);
+                setCombinedDrawableColor(chat_photoStatesDrawables[10 + a][1], getChatColor(key_chat_inLoaderPhotoIconSelected), true);
             }
 
-            setDrawableColorByKey(chat_photoStatesDrawables[9][0], key_chat_outFileIcon);
-            setDrawableColorByKey(chat_photoStatesDrawables[9][1], key_chat_outFileSelectedIcon);
-            setDrawableColorByKey(chat_photoStatesDrawables[12][0], key_chat_inFileIcon);
-            setDrawableColorByKey(chat_photoStatesDrawables[12][1], key_chat_inFileSelectedIcon);
+            setDrawableColor(chat_photoStatesDrawables[9][0], getChatColor(key_chat_outFileIcon));
+            setDrawableColor(chat_photoStatesDrawables[9][1], getChatColor(key_chat_outFileSelectedIcon));
+            setDrawableColor(chat_photoStatesDrawables[12][0], getChatColor(key_chat_inFileIcon));
+            setDrawableColor(chat_photoStatesDrawables[12][1], getChatColor(key_chat_inFileSelectedIcon));
 
-            setCombinedDrawableColor(chat_contactDrawable[0], getColor(key_chat_inContactBackground), false);
-            setCombinedDrawableColor(chat_contactDrawable[0], getColor(key_chat_inContactIcon), true);
-            setCombinedDrawableColor(chat_contactDrawable[1], getColor(key_chat_outContactBackground), false);
-            setCombinedDrawableColor(chat_contactDrawable[1], getColor(key_chat_outContactIcon), true);
+            setCombinedDrawableColor(chat_contactDrawable[0], getChatColor(key_chat_inContactBackground), false);
+            setCombinedDrawableColor(chat_contactDrawable[0], getChatColor(key_chat_inContactIcon), true);
+            setCombinedDrawableColor(chat_contactDrawable[1], getChatColor(key_chat_outContactBackground), false);
+            setCombinedDrawableColor(chat_contactDrawable[1], getChatColor(key_chat_outContactIcon), true);
 
-            setDrawableColor(chat_locationDrawable[0], getColor(key_chat_inLocationIcon));
-            setDrawableColor(chat_locationDrawable[1], getColor(key_chat_outLocationIcon));
+            setDrawableColor(chat_locationDrawable[0], getChatColor(key_chat_inLocationIcon));
+            setDrawableColor(chat_locationDrawable[1], getChatColor(key_chat_outLocationIcon));
 
-            setDrawableColor(chat_pollHintDrawable[0], getColor(key_chat_inPreviewInstantText));
-            setDrawableColor(chat_pollHintDrawable[1], getColor(key_chat_outPreviewInstantText));
+            setDrawableColor(chat_pollHintDrawable[0], getChatColor(key_chat_inPreviewInstantText));
+            setDrawableColor(chat_pollHintDrawable[1], getChatColor(key_chat_outPreviewInstantText));
 
-            setDrawableColor(chat_psaHelpDrawable[0], getColor(key_chat_inViews));
-            setDrawableColor(chat_psaHelpDrawable[1], getColor(key_chat_outViews));
+            setDrawableColor(chat_psaHelpDrawable[0], getChatColor(key_chat_inViews));
+            setDrawableColor(chat_psaHelpDrawable[1], getChatColor(key_chat_outViews));
 
-            setDrawableColorByKey(chat_composeShadowDrawable, key_chat_messagePanelShadow);
-            setDrawableColorByKey(chat_composeShadowRoundDrawable, key_chat_messagePanelBackground);
+            setDrawableColor(chat_composeShadowDrawable, getChatColor(key_chat_messagePanelShadow));
+            setDrawableColor(chat_composeShadowRoundDrawable, getChatColor(key_chat_messagePanelBackground));
 
-            int color = getColor(key_chat_outAudioSeekbarFill);
+            int color = getChatColor(key_chat_outAudioSeekbarFill);
             if (color == 0xffffffff) {
-                color = Theme.getColor(Theme.key_chat_outBubble);
+                color = Theme.getChatColor(Theme.key_chat_outBubble);
             } else {
                 color = 0xffffffff;
             }
             setDrawableColor(chat_pollCheckDrawable[1], color);
             setDrawableColor(chat_pollCrossDrawable[1], color);
 
-            setDrawableColor(chat_attachEmptyDrawable, getColor(key_chat_attachEmptyImage));
+            setDrawableColor(chat_attachEmptyDrawable, getChatColor(key_chat_attachEmptyImage));
+
 
             if (!bg) {
                 applyChatServiceMessageColor();
@@ -8167,6 +8641,7 @@ public class Theme {
     }
 
     private static int[] viewPos = new int[2];
+
     public static void applyServiceShaderMatrixForView(View view, View background) {
         if (view == null || background == null) {
             return;
@@ -8322,7 +8797,8 @@ public class Theme {
     private static ColorFilter currentShareColorFilter;
     private static int currentShareColorFilterColor;
     private static ColorFilter currentShareSelectedColorFilter;
-    private static  int currentShareSelectedColorFilterColor;
+    private static int currentShareSelectedColorFilterColor;
+
     public static ColorFilter getShareColorFilter(int color, boolean selected) {
         if (selected) {
             if (currentShareSelectedColorFilter == null || currentShareSelectedColorFilterColor != color) {
@@ -8431,6 +8907,13 @@ public class Theme {
         return getColor(key, null, true);
     }
 
+    public static int getColor(String key, int mask) {
+        if (mask == CHAT_MASK) {
+            return getChatColor(key);
+        }
+        return getColor(key);
+    }
+
     public static int getColor(String key) {
         return getColor(key, null, false);
     }
@@ -8440,6 +8923,10 @@ public class Theme {
     }
 
     public static int getColor(String key, boolean[] isDefault, boolean ignoreAnimation) {
+//        if(inChatTheme != null && chatColorsOverride.containsKey(key)){
+//            return chatColorsOverride.get(key);
+//        }
+
         if (!ignoreAnimation && animatingColors != null) {
             Integer color = animatingColors.get(key);
             if (color != null) {
@@ -8700,14 +9187,19 @@ public class Theme {
         return serviceColor == null ? serviceMessageColor : serviceColor;
     }
 
-    public static void loadWallpaper() {
+    public static Drawable loadWallpaper() {
+        return loadWallpaper(currentTheme.getAccent(false));
+    }
+
+    public static Drawable loadWallpaper(ThemeAccent accent) {
+
         if (wallpaper != null) {
-            return;
+            return null;
         }
         boolean defaultTheme = currentTheme.firstAccentIsDefault && currentTheme.currentAccentId == DEFALT_THEME_ACCENT_ID;
         File wallpaperFile;
         boolean wallpaperMotion;
-        ThemeAccent accent = currentTheme.getAccent(false);
+        //ThemeAccent accent =  currentTheme.getAccent(false);
         if (accent != null) {
             wallpaperFile = accent.getPathToWallpaper();
             wallpaperMotion = accent.patternMotion;
@@ -8734,6 +9226,7 @@ public class Theme {
             }
             patternIntensity = intensity;
             if (!overrideTheme) {
+
                 Integer backgroundColor = defaultTheme ? null : currentColors.get(key_chat_wallpaper);
                 Integer gradientToColor3 = currentColors.get(key_chat_wallpaper_gradient_to3);
                 if (gradientToColor3 == null) {
@@ -8742,6 +9235,7 @@ public class Theme {
                 Integer gradientToColor2 = currentColors.get(key_chat_wallpaper_gradient_to2);
                 Integer gradientToColor1 = currentColors.get(key_chat_wallpaper_gradient_to1);
                 if (wallpaperFile != null && wallpaperFile.exists()) {
+
                     try {
                         if (backgroundColor != null && gradientToColor1 != null && gradientToColor2 != null) {
                             MotionBackgroundDrawable motionBackgroundDrawable = new MotionBackgroundDrawable(backgroundColor, gradientToColor1, gradientToColor2, gradientToColor3, false);
@@ -8757,6 +9251,7 @@ public class Theme {
                         FileLog.e(e);
                     }
                 } else if (backgroundColor != null) {
+
                     Integer rotation = currentColors.get(key_chat_wallpaper_gradient_rotation);
                     if (rotation == null) {
                         rotation = 45;
@@ -8786,6 +9281,7 @@ public class Theme {
                     }
                     isCustomTheme = true;
                 } else if (themedWallpaperLink != null) {
+
                     try {
                         File pathToWallpaper = new File(ApplicationLoader.getFilesDirFixed(), Utilities.MD5(themedWallpaperLink) + ".wp");
                         Bitmap bitmap = loadScreenSizedBitmap(new FileInputStream(pathToWallpaper), 0);
@@ -8797,6 +9293,7 @@ public class Theme {
                         FileLog.e(e);
                     }
                 } else if (themedWallpaperFileOffset > 0 && (currentTheme.pathToFile != null || currentTheme.assetName != null)) {
+
                     try {
                         File file;
                         if (currentTheme.assetName != null) {
@@ -8815,12 +9312,15 @@ public class Theme {
                 }
             }
             if (wallpaper == null) {
+
                 int selectedColor = overrideWallpaper != null ? overrideWallpaper.color : 0;
                 try {
                     if (overrideWallpaper == null || overrideWallpaper.isDefault()) {
+
                         wallpaper = createDefaultWallpaper();
                         isCustomTheme = false;
                     } else if (!overrideWallpaper.isColor() || overrideWallpaper.gradientColor1 != 0) {
+
                         if (selectedColor != 0 && (!isPatternWallpaper || overrideWallpaper.gradientColor2 != 0)) {
                             if (overrideWallpaper.gradientColor1 != 0 && overrideWallpaper.gradientColor2 != 0) {
                                 MotionBackgroundDrawable motionBackgroundDrawable = new MotionBackgroundDrawable(overrideWallpaper.color, overrideWallpaper.gradientColor1, overrideWallpaper.gradientColor2, overrideWallpaper.gradientColor3, false);
@@ -8886,6 +9386,7 @@ public class Theme {
                 NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.didSetNewWallpapper);
             });
         });
+        return wallpaper;
     }
 
     public static Drawable createDefaultWallpaper() {
@@ -8953,6 +9454,127 @@ public class Theme {
         }
         return null;
     }
+
+//    public static Drawable getWallpaperPreview(ThemeInfo theme, View ownerView) {
+//        ThemeAccent accent = theme.getAccent(false);
+//        Integer backgroundColor = accent.accentColor;// currentColors.get(key_chat_wallpaper);
+//        File file = null;
+//        MotionBackgroundDrawable motionBackgroundDrawable = null;
+//        int offset = 0;
+//        if (backgroundColor != null) {
+//            Integer gradientToColor1 = accent.backgroundGradientOverrideColor1;// currentColors.get(key_chat_wallpaper_gradient_to1);
+//            Integer gradientToColor2 = currentColors.get(key_chat_wallpaper_gradient_to2);
+//            Integer gradientToColor3 = currentColors.get(key_chat_wallpaper_gradient_to3);
+//            Integer rotation = currentColors.get(key_chat_wallpaper_gradient_rotation);
+//            if (rotation == null) {
+//                rotation = 45;
+//            }
+//            if (gradientToColor1 == null) {
+//                return new ColorDrawable(backgroundColor);
+//            } else {
+//                ThemeAccent accent = currentTheme.getAccent(false);
+//                if (accent != null && !TextUtils.isEmpty(accent.patternSlug) && previousTheme == null) {
+//                    File wallpaperFile = accent.getPathToWallpaper();
+//                    if (wallpaperFile != null && wallpaperFile.exists()) {
+//                        file = wallpaperFile;
+//                    }
+//                }
+//                if (gradientToColor2 != null) {
+//                    motionBackgroundDrawable = new MotionBackgroundDrawable(backgroundColor, gradientToColor1, gradientToColor2, gradientToColor3 != null ? gradientToColor3 : 0, true);
+//                    if (file == null) {
+//                        return motionBackgroundDrawable;
+//                    }
+//                } else if (file == null) {
+//                    final int[] colors = {backgroundColor, gradientToColor1};
+//                    final GradientDrawable.Orientation orientation = BackgroundGradientDrawable.getGradientOrientation(rotation);
+//                    final BackgroundGradientDrawable backgroundGradientDrawable = new BackgroundGradientDrawable(orientation, colors);
+//                    final BackgroundGradientDrawable.Sizes sizes;
+//                    if (!thumb) {
+//                        sizes = BackgroundGradientDrawable.Sizes.ofDeviceScreen();
+//                    } else {
+//                        sizes = BackgroundGradientDrawable.Sizes.ofDeviceScreen(BackgroundGradientDrawable.DEFAULT_COMPRESS_RATIO / 4f, BackgroundGradientDrawable.Sizes.Orientation.PORTRAIT);
+//                    }
+//                    final BackgroundGradientDrawable.Listener listener;
+//                    if (ownerView != null) {
+//                        listener = new BackgroundGradientDrawable.ListenerAdapter() {
+//                            @Override
+//                            public void onSizeReady(int width, int height) {
+//                                if (!thumb) {
+//                                    final boolean isOrientationPortrait = AndroidUtilities.displaySize.x <= AndroidUtilities.displaySize.y;
+//                                    final boolean isGradientPortrait = width <= height;
+//                                    if (isOrientationPortrait == isGradientPortrait) {
+//                                        ownerView.invalidate();
+//                                    }
+//                                } else {
+//                                    ownerView.invalidate();
+//                                }
+//                            }
+//                        };
+//                    } else {
+//                        listener = null;
+//                    }
+//                    backgroundGradientDrawable.startDithering(sizes, listener);
+//                    return backgroundGradientDrawable;
+//                }
+//            }
+//        } else if (themedWallpaperFileOffset > 0 && (currentTheme.pathToFile != null || currentTheme.assetName != null)) {
+//            if (currentTheme.assetName != null) {
+//                file = getAssetFile(currentTheme.assetName);
+//            } else {
+//                file = new File(currentTheme.pathToFile);
+//            }
+//            offset = themedWallpaperFileOffset;
+//        }
+//        if (file != null) {
+//            FileInputStream stream = null;
+//            try {
+//                int currentPosition = 0;
+//                stream = new FileInputStream(file);
+//                stream.getChannel().position(offset);
+//                BitmapFactory.Options opts = new BitmapFactory.Options();
+//                int scaleFactor = 1;
+//                if (thumb) {
+//                    opts.inJustDecodeBounds = true;
+//                    float photoW = opts.outWidth;
+//                    float photoH = opts.outHeight;
+//                    int maxWidth = AndroidUtilities.dp(100);
+//                    while (photoW > maxWidth || photoH > maxWidth) {
+//                        scaleFactor *= 2;
+//                        photoW /= 2;
+//                        photoH /= 2;
+//                    }
+//                }
+//                opts.inJustDecodeBounds = false;
+//                opts.inSampleSize = scaleFactor;
+//                Bitmap bitmap = BitmapFactory.decodeStream(stream, null, opts);
+//                if (motionBackgroundDrawable != null) {
+//                    int intensity;
+//                    ThemeAccent accent = currentTheme.getAccent(false);
+//                    if (accent != null) {
+//                        intensity = (int) (accent.patternIntensity * 100);
+//                    } else {
+//                        intensity = 100;
+//                    }
+//                    motionBackgroundDrawable.setPatternBitmap(intensity, bitmap);
+//                    return motionBackgroundDrawable;
+//                }
+//                if (bitmap != null) {
+//                    return new BitmapDrawable(bitmap);
+//                }
+//            } catch (Throwable e) {
+//                FileLog.e(e);
+//            } finally {
+//                try {
+//                    if (stream != null) {
+//                        stream.close();
+//                    }
+//                } catch (Exception e) {
+//                    FileLog.e(e);
+//                }
+//            }
+//        }
+//        return null;
+//    }
 
     public static Drawable getThemedWallpaper(boolean thumb, View ownerView) {
         Integer backgroundColor = currentColors.get(key_chat_wallpaper);
@@ -9085,6 +9707,11 @@ public class Theme {
     }
 
     public static Drawable getCachedWallpaper() {
+
+        if (chatMask != null && chatMaskWallpaper != null) {
+            return chatMaskWallpaper;
+        }
+
         Drawable drawable;
         if (themedWallpaper != null) {
             drawable = themedWallpaper;
@@ -9109,6 +9736,10 @@ public class Theme {
     }
 
     public static Drawable getCachedWallpaperNonBlocking() {
+        if (chatMask != null && chatMaskWallpaper != null) {
+            return chatMaskWallpaper;
+        }
+
         if (themedWallpaper != null) {
             return themedWallpaper;
         } else {
@@ -9117,6 +9748,9 @@ public class Theme {
     }
 
     public static boolean isWallpaperMotion() {
+        if (chatMask != null) {
+            return isWallpaperInChatMotion;
+        }
         return isWallpaperMotion;
     }
 
